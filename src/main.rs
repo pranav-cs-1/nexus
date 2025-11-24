@@ -29,6 +29,32 @@ async fn main() -> anyhow::Result<()> {
     
     let mut state = AppState::new();
     
+    state.requests.push(models::request::HttpRequest::new(
+        "Get JSONPlaceholder Post".to_string(),
+        models::request::HttpMethod::GET,
+        "https://jsonplaceholder.typicode.com/posts/1".to_string(),
+    ));
+    
+    state.requests.push(models::request::HttpRequest::new(
+        "List JSONPlaceholder Posts".to_string(),
+        models::request::HttpMethod::GET,
+        "https://jsonplaceholder.typicode.com/posts".to_string(),
+    ));
+    
+    state.requests.push(
+        models::request::HttpRequest::new(
+            "Create Post".to_string(),
+            models::request::HttpMethod::POST,
+            "https://jsonplaceholder.typicode.com/posts".to_string(),
+        )
+        .with_header("Content-Type".to_string(), "application/json".to_string())
+        .with_body(r#"{"title": "foo", "body": "bar", "userId": 1}"#.to_string())
+    );
+    
+    if !state.requests.is_empty() {
+        state.selected_request = Some(0);
+    }
+    
     let http_client = http::client::HttpClient::new()?;
     
     loop {
