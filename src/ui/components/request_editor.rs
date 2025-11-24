@@ -1,9 +1,10 @@
-use crate::app::state::{AppState, EditorTab, InputMode, Panel};
+use crate::app::state::{AppState, EditorTab, InputMode, Panel, EditorField};
 use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Tabs, Widget},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Tabs, Widget},
+    style::Style,
 };
 
 pub struct RequestEditor<'a> {
@@ -19,6 +20,7 @@ impl<'a> RequestEditor<'a> {
 impl<'a> Widget for RequestEditor<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
         let is_focused = self.state.focused_panel == Panel::RequestEditor;
+        let is_editing = self.state.input_mode == InputMode::Editing && is_focused;
         
         let border_style = if is_focused {
             Theme::focused_border()
@@ -26,67 +28,44 @@ impl<'a> Widget for RequestEditor<'a> {
             Theme::unfocused_border()
         };
         
+        let title = if is_editing {
+            "Request Editor [EDITING - ESC to save, Tab to switch fields]"
+        } else {
+            "Request Editor [Press 'e' to edit]"
+        };
         
         let block = Block::default()
-            .title("Request Editor")
+            .title(title)
             .borders(Borders::ALL)
             .border_style(border_style);
         
         let inner_area = block.inner(area);
         block.render(area, buf);
-        let inner_chunks = Layout::default()
+        
+        let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(3),
-                Constraint::Length(1),
-                Constraint::Min(0),
+                Constraint::Length(3), // Name + Method
+                Constraint::Length(3), // URL
+                Constraint::Length(1), // Tabs
+                Constraint::Min(0),    // Content
             ])
             .split(inner_area);
         
         if let Some(request) = self.state.get_current_request() {
-            let is_editing_url = self.state.input_mode == InputMode::Editing 
-                && self.state.focused_panel == Panel::RequestEditor;
+            // Name and Method row
+            let name_method_chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
+                .split(chunks[0]);
             
-            let url_title = if is_editing_url {
-                "URL [EDITING - ESC to finish]"
-            } else {
-                "URL [Press 'e' to edit]"
-            };
+            self.render_name_field(name_method_chunks[0], buf, request, is_editing);
+            self.render_method_field(name_method_chunks[1], buf, request, is_editing);
             
-            let url_block = Block::default()
-                .title(url_title)
-                .borders(Borders::ALL)
-                .border_style(if is_editing_url {
-                    Theme::selected()
-                } else {
-                    Theme::unfocused_border()
-                });
+            // URL field
+            self.render_url_field(chunks[1], buf, request, is_editing);
             
-            let url_display = if is_editing_url {
-                &self.state.url_input
-            } else {
-                &request.url
-            };
-            
-            let url_line = if is_editing_url {
-                let cursor_pos = self.state.url_cursor;
-                let before = url_display.chars().take(cursor_pos).collect::<String>();
-                let cursor_char = url_display.chars().nth(cursor_pos).unwrap_or(' ');
-                let after = url_display.chars().skip(cursor_pos + 1).collect::<String>();
-                
-                Line::from(vec![
-                    Span::raw(before),
-                    Span::styled(cursor_char.to_string(), Theme::selected()),
-                    Span::raw(after),
-                ])
-            } else {
-                Line::from(url_display.as_str())
-            };
-            
-            let url_text = Paragraph::new(url_line)
-                .block(url_block);
-            url_text.render(inner_chunks[0], buf);
-            
+            // Tabs
             let tabs = Tabs::new(vec!["Params", "Headers", "Body", "Auth"])
                 .select(match self.state.editor_tab {
                     EditorTab::Params => 0,
@@ -96,57 +75,273 @@ impl<'a> Widget for RequestEditor<'a> {
                 })
                 .style(Theme::default())
                 .highlight_style(Theme::selected());
-            tabs.render(inner_chunks[1], buf);
+            tabs.render(chunks[2], buf);
             
-            let content = match self.state.editor_tab {
-                EditorTab::Params => {
-                    if request.query_params.is_empty() {
-                        "No query parameters".to_string()
-                    } else {
-                        request.query_params
-                            .iter()
-                            .map(|(k, v)| format!("{}: {}", k, v))
-                            .collect::<Vec<_>>()
-                            .join("\n")
-                    }
-                }
-                EditorTab::Headers => {
-                    if request.headers.is_empty() {
-                        "No headers".to_string()
-                    } else {
-                        request.headers
-                            .iter()
-                            .map(|(k, v)| format!("{}: {}", k, v))
-                            .collect::<Vec<_>>()
-                            .join("\n")
-                    }
-                }
-                EditorTab::Body => {
-                    request.body.as_deref().unwrap_or("No body").to_string()
-                }
-                EditorTab::Auth => {
-                    match &request.auth {
-                        crate::models::request::AuthType::None => "No authentication".to_string(),
-                        crate::models::request::AuthType::Bearer { token } => {
-                            format!("Bearer: {}", token)
-                        }
-                        crate::models::request::AuthType::Basic { username, password } => {
-                            format!("Basic: {} / {}", username, password)
-                        }
-                        crate::models::request::AuthType::ApiKey { key, value, location } => {
-                            format!("API Key: {} = {} ({:?})", key, value, location)
-                        }
-                    }
-                }
-            };
-            
-            let content_paragraph = Paragraph::new(content);
-            content_paragraph.render(inner_chunks[2], buf);
+            // Content area
+            match self.state.editor_tab {
+                EditorTab::Params => self.render_params_content(chunks[3], buf, request, is_editing),
+                EditorTab::Headers => self.render_headers_content(chunks[3], buf, request, is_editing),
+                EditorTab::Body => self.render_body_content(chunks[3], buf, request, is_editing),
+                EditorTab::Auth => self.render_auth_content(chunks[3], buf, request, is_editing),
+            }
         } else {
             let no_request = Paragraph::new("No request selected")
                 .block(Block::default());
             no_request.render(inner_area, buf);
         }
+    }
+}
+
+impl<'a> RequestEditor<'a> {
+    fn render_name_field(&self, area: Rect, buf: &mut ratatui::buffer::Buffer, request: &crate::models::request::HttpRequest, is_editing: bool) {
+        let is_focused = is_editing && self.state.editor_focused_field == EditorField::Name;
+        
+        let block = Block::default()
+            .title("Name")
+            .borders(Borders::ALL)
+            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
+        
+        let text = if is_editing {
+            let display_text = &self.state.name_input;
+            if is_focused {
+                let cursor_pos = self.state.name_cursor;
+                let before = display_text.chars().take(cursor_pos).collect::<String>();
+                let cursor_char = display_text.chars().nth(cursor_pos).unwrap_or(' ');
+                let after = display_text.chars().skip(cursor_pos + 1).collect::<String>();
+                
+                Line::from(vec![
+                    Span::raw(before),
+                    Span::styled(cursor_char.to_string(), Theme::selected()),
+                    Span::raw(after),
+                ])
+            } else {
+                Line::from(display_text.as_str())
+            }
+        } else {
+            Line::from(request.name.as_str())
+        };
+        
+        Paragraph::new(text).block(block).render(area, buf);
+    }
+    
+    fn render_method_field(&self, area: Rect, buf: &mut ratatui::buffer::Buffer, request: &crate::models::request::HttpRequest, is_editing: bool) {
+        let is_focused = is_editing && self.state.editor_focused_field == EditorField::Method;
+        
+        let block = Block::default()
+            .title("Method")
+            .borders(Borders::ALL)
+            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
+        
+        let text = if is_editing {
+            let methods = crate::models::request::HttpMethod::all();
+            let method_str = if let Some(method) = methods.get(self.state.method_input) {
+                method.as_str().to_string()
+            } else {
+                "GET".to_string()
+            };
+            Line::from(method_str)
+        } else {
+            Line::from(request.method.as_str())
+        };
+        
+        Paragraph::new(text).block(block).render(area, buf);
+    }
+    
+    fn render_url_field(&self, area: Rect, buf: &mut ratatui::buffer::Buffer, request: &crate::models::request::HttpRequest, is_editing: bool) {
+        let is_focused = is_editing && self.state.editor_focused_field == EditorField::Url;
+        
+        let block = Block::default()
+            .title("URL")
+            .borders(Borders::ALL)
+            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
+        
+        let text = if is_editing {
+            let display_text = &self.state.url_input;
+            if is_focused {
+                let cursor_pos = self.state.url_cursor;
+                let before = display_text.chars().take(cursor_pos).collect::<String>();
+                let cursor_char = display_text.chars().nth(cursor_pos).unwrap_or(' ');
+                let after = display_text.chars().skip(cursor_pos + 1).collect::<String>();
+                
+                Line::from(vec![
+                    Span::raw(before),
+                    Span::styled(cursor_char.to_string(), Theme::selected()),
+                    Span::raw(after),
+                ])
+            } else {
+                Line::from(display_text.as_str())
+            }
+        } else {
+            Line::from(request.url.as_str())
+        };
+        
+        Paragraph::new(text).block(block).render(area, buf);
+    }
+    
+    fn render_params_content(&self, area: Rect, buf: &mut ratatui::buffer::Buffer, request: &crate::models::request::HttpRequest, is_editing: bool) {
+        let is_focused = is_editing && self.state.editor_focused_field == EditorField::Params;
+        
+        let block = Block::default()
+            .title(if is_focused { "Query Parameters [+ to add, - to delete, ↑↓ to navigate]" } else { "Query Parameters" })
+            .borders(Borders::ALL)
+            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
+        
+        if is_editing {
+            let items: Vec<ListItem> = self.state.params_input
+                .iter()
+                .enumerate()
+                .map(|(i, (key, value))| {
+                    let style = if i == self.state.params_selected {
+                        Theme::selected()
+                    } else {
+                        Style::default()
+                    };
+                    ListItem::new(format!("{}: {}", key, value)).style(style)
+                })
+                .collect();
+            
+            if items.is_empty() {
+                Paragraph::new("No parameters (press + to add)")
+                    .block(block)
+                    .render(area, buf);
+            } else {
+                List::new(items)
+                    .block(block)
+                    .render(area, buf);
+            }
+        } else {
+            let content = if request.query_params.is_empty() {
+                "No query parameters".to_string()
+            } else {
+                request.query_params
+                    .iter()
+                    .map(|(k, v)| format!("{}: {}", k, v))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+            
+            Paragraph::new(content).block(block).render(area, buf);
+        }
+    }
+    
+    fn render_headers_content(&self, area: Rect, buf: &mut ratatui::buffer::Buffer, request: &crate::models::request::HttpRequest, is_editing: bool) {
+        let is_focused = is_editing && self.state.editor_focused_field == EditorField::Headers;
+        
+        let block = Block::default()
+            .title(if is_focused { "Headers [+ to add, - to delete, ↑↓ to navigate]" } else { "Headers" })
+            .borders(Borders::ALL)
+            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
+        
+        if is_editing {
+            let items: Vec<ListItem> = self.state.headers_input
+                .iter()
+                .enumerate()
+                .map(|(i, (key, value))| {
+                    let style = if i == self.state.headers_selected {
+                        Theme::selected()
+                    } else {
+                        Style::default()
+                    };
+                    ListItem::new(format!("{}: {}", key, value)).style(style)
+                })
+                .collect();
+            
+            if items.is_empty() {
+                Paragraph::new("No headers (press + to add)")
+                    .block(block)
+                    .render(area, buf);
+            } else {
+                List::new(items)
+                    .block(block)
+                    .render(area, buf);
+            }
+        } else {
+            let content = if request.headers.is_empty() {
+                "No headers".to_string()
+            } else {
+                request.headers
+                    .iter()
+                    .map(|(k, v)| format!("{}: {}", k, v))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+            
+            Paragraph::new(content).block(block).render(area, buf);
+        }
+    }
+    
+    fn render_body_content(&self, area: Rect, buf: &mut ratatui::buffer::Buffer, request: &crate::models::request::HttpRequest, is_editing: bool) {
+        let is_focused = is_editing && self.state.editor_focused_field == EditorField::Body;
+        
+        let block = Block::default()
+            .title("Body")
+            .borders(Borders::ALL)
+            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
+        
+        let text = if is_editing {
+            let display_text = &self.state.body_input;
+            if is_focused {
+                let cursor_pos = self.state.body_cursor;
+                let before = display_text.chars().take(cursor_pos).collect::<String>();
+                let cursor_char = display_text.chars().nth(cursor_pos).unwrap_or(' ');
+                let after = display_text.chars().skip(cursor_pos + 1).collect::<String>();
+                
+                Line::from(vec![
+                    Span::raw(before),
+                    Span::styled(cursor_char.to_string(), Theme::selected()),
+                    Span::raw(after),
+                ])
+            } else {
+                Line::from(display_text.as_str())
+            }
+        } else {
+            Line::from(request.body.as_deref().unwrap_or("No body"))
+        };
+        
+        Paragraph::new(text).block(block).render(area, buf);
+    }
+    
+    fn render_auth_content(&self, area: Rect, buf: &mut ratatui::buffer::Buffer, request: &crate::models::request::HttpRequest, is_editing: bool) {
+        let is_focused = is_editing && self.state.editor_focused_field == EditorField::Auth;
+        
+        let block = Block::default()
+            .title("Authentication (Bearer Token)")
+            .borders(Borders::ALL)
+            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
+        
+        let text = if is_editing {
+            let display_text = &self.state.auth_input;
+            if is_focused {
+                let cursor_pos = self.state.auth_cursor;
+                let before = display_text.chars().take(cursor_pos).collect::<String>();
+                let cursor_char = display_text.chars().nth(cursor_pos).unwrap_or(' ');
+                let after = display_text.chars().skip(cursor_pos + 1).collect::<String>();
+                
+                Line::from(vec![
+                    Span::raw(before),
+                    Span::styled(cursor_char.to_string(), Theme::selected()),
+                    Span::raw(after),
+                ])
+            } else {
+                Line::from(display_text.as_str())
+            }
+        } else {
+            let auth_text = match &request.auth {
+                crate::models::request::AuthType::None => "No authentication".to_string(),
+                crate::models::request::AuthType::Bearer { token } => {
+                    format!("Bearer: {}", token)
+                }
+                crate::models::request::AuthType::Basic { username, password } => {
+                    format!("Basic: {} / {}", username, password)
+                }
+                crate::models::request::AuthType::ApiKey { key, value, location } => {
+                    format!("API Key: {} = {} ({:?})", key, value, location)
+                }
+            };
+            Line::from(auth_text)
+        };
+        
+        Paragraph::new(text).block(block).render(area, buf);
     }
 }
 

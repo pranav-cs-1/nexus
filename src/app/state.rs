@@ -28,6 +28,17 @@ pub enum InputMode {
     Editing,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum EditorField {
+    Name,
+    Method,
+    Url,
+    Params,
+    Headers,
+    Body,
+    Auth,
+}
+
 #[derive(Debug)]
 pub struct AppState {
     pub collections: Vec<Collection>,
@@ -49,10 +60,22 @@ pub struct AppState {
     pub is_loading: bool,
     pub loading_message: String,
     
+    pub editor_focused_field: EditorField,
+    
+    // Input buffers for editing
+    pub name_input: String,
+    pub name_cursor: usize,
+    pub method_input: usize, // Index into HttpMethod::all()
     pub url_input: String,
     pub url_cursor: usize,
+    pub params_input: Vec<(String, String)>,
+    pub params_selected: usize,
+    pub headers_input: Vec<(String, String)>,
+    pub headers_selected: usize,
     pub body_input: String,
     pub body_cursor: usize,
+    pub auth_input: String,
+    pub auth_cursor: usize,
     
     pub should_quit: bool,
 }
@@ -79,10 +102,21 @@ impl AppState {
             is_loading: false,
             loading_message: String::new(),
             
+            editor_focused_field: EditorField::Url,
+            
+            name_input: String::new(),
+            name_cursor: 0,
+            method_input: 0,
             url_input: String::new(),
             url_cursor: 0,
+            params_input: Vec::new(),
+            params_selected: 0,
+            headers_input: Vec::new(),
+            headers_selected: 0,
             body_input: String::new(),
             body_cursor: 0,
+            auth_input: String::new(),
+            auth_cursor: 0,
             
             should_quit: false,
         }
@@ -98,27 +132,92 @@ impl AppState {
     
     pub fn load_current_request_to_input(&mut self) {
         if let Some(request) = self.get_current_request() {
+            let name = request.name.clone();
+            let method = request.method.clone();
             let url = request.url.clone();
+            let params: Vec<(String, String)> = request.query_params.iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            let headers: Vec<(String, String)> = request.headers.iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
             let body = request.body.clone().unwrap_or_default();
+            let auth = match &request.auth {
+                crate::models::request::AuthType::Bearer { token } => token.clone(),
+                _ => String::new(),
+            };
+            
+            self.name_input = name;
+            self.name_cursor = self.name_input.len();
+            
+            self.method_input = crate::models::request::HttpMethod::all()
+                .iter()
+                .position(|m| *m == method)
+                .unwrap_or(0);
             
             self.url_input = url;
             self.url_cursor = self.url_input.len();
+            
+            self.params_input = params;
+            self.params_selected = 0;
+            
+            self.headers_input = headers;
+            self.headers_selected = 0;
+            
             self.body_input = body;
             self.body_cursor = self.body_input.len();
+            
+            self.auth_input = auth;
+            self.auth_cursor = self.auth_input.len();
         }
     }
     
     pub fn save_input_to_request(&mut self) {
+        // Clone all the input values first to avoid borrow checker issues
+        let name = self.name_input.clone();
+        let method_idx = self.method_input;
         let url = self.url_input.clone();
-        let body = if !self.body_input.is_empty() {
-            Some(self.body_input.clone())
-        } else {
-            None
-        };
+        let params = self.params_input.clone();
+        let headers = self.headers_input.clone();
+        let body = self.body_input.clone();
+        let auth = self.auth_input.clone();
         
         if let Some(request) = self.get_current_request_mut() {
+            request.name = name;
+            
+            if let Some(method) = crate::models::request::HttpMethod::all().get(method_idx) {
+                request.method = method.clone();
+            }
+            
             request.url = url;
-            request.body = body;
+            
+            request.query_params.clear();
+            for (key, value) in &params {
+                if !key.is_empty() {
+                    request.query_params.insert(key.clone(), value.clone());
+                }
+            }
+            
+            request.headers.clear();
+            for (key, value) in &headers {
+                if !key.is_empty() {
+                    request.headers.insert(key.clone(), value.clone());
+                }
+            }
+            
+            request.body = if !body.is_empty() {
+                Some(body)
+            } else {
+                None
+            };
+            
+            if !auth.is_empty() {
+                request.auth = crate::models::request::AuthType::Bearer {
+                    token: auth,
+                };
+            } else {
+                request.auth = crate::models::request::AuthType::None;
+            }
         }
     }
     
@@ -188,6 +287,34 @@ impl AppState {
         if let Some(idx) = self.selected_collection {
             if idx > 0 {
                 self.selected_collection = Some(idx - 1);
+            }
+        }
+    }
+    
+    pub fn add_param(&mut self) {
+        self.params_input.push((String::new(), String::new()));
+        self.params_selected = self.params_input.len().saturating_sub(1);
+    }
+    
+    pub fn delete_param(&mut self) {
+        if !self.params_input.is_empty() && self.params_selected < self.params_input.len() {
+            self.params_input.remove(self.params_selected);
+            if self.params_selected >= self.params_input.len() && !self.params_input.is_empty() {
+                self.params_selected = self.params_input.len() - 1;
+            }
+        }
+    }
+    
+    pub fn add_header(&mut self) {
+        self.headers_input.push((String::new(), String::new()));
+        self.headers_selected = self.headers_input.len().saturating_sub(1);
+    }
+    
+    pub fn delete_header(&mut self) {
+        if !self.headers_input.is_empty() && self.headers_selected < self.headers_input.len() {
+            self.headers_input.remove(self.headers_selected);
+            if self.headers_selected >= self.headers_input.len() && !self.headers_input.is_empty() {
+                self.headers_selected = self.headers_input.len() - 1;
             }
         }
     }

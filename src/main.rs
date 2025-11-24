@@ -7,7 +7,7 @@ mod utils;
 mod export;
 mod import;
 
-use app::state::{AppState, InputMode, Panel};
+use app::state::{AppState, InputMode, Panel, EditorField};
 use app::actions::Action;
 use crossterm::{
     event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
@@ -160,6 +160,13 @@ async fn main() -> anyhow::Result<()> {
                     if state.focused_panel == Panel::RequestEditor {
                         state.load_current_request_to_input();
                         state.input_mode = InputMode::Editing;
+                        // Set focused field based on current tab
+                        state.editor_focused_field = match state.editor_tab {
+                            app::state::EditorTab::Params => EditorField::Params,
+                            app::state::EditorTab::Headers => EditorField::Headers,
+                            app::state::EditorTab::Body => EditorField::Body,
+                            app::state::EditorTab::Auth => EditorField::Auth,
+                        };
                     }
                 }
                 (KeyCode::Char('c'), KeyModifiers::NONE) => {
@@ -193,6 +200,88 @@ fn handle_edit_mode(state: &mut AppState, key: KeyEvent) {
             state.save_input_to_request();
             state.input_mode = InputMode::Normal;
         }
+        KeyCode::Tab => {
+            // Switch between fields in edit mode
+            state.editor_focused_field = match state.editor_focused_field {
+                EditorField::Name => EditorField::Method,
+                EditorField::Method => EditorField::Url,
+                EditorField::Url => EditorField::Params,
+                EditorField::Params => EditorField::Headers,
+                EditorField::Headers => EditorField::Body,
+                EditorField::Body => EditorField::Auth,
+                EditorField::Auth => EditorField::Name,
+            };
+        }
+        _ => {
+            match state.editor_focused_field {
+                EditorField::Name => handle_name_edit(state, key),
+                EditorField::Method => handle_method_edit(state, key),
+                EditorField::Url => handle_url_edit(state, key),
+                EditorField::Params => handle_params_edit(state, key),
+                EditorField::Headers => handle_headers_edit(state, key),
+                EditorField::Body => handle_body_edit(state, key),
+                EditorField::Auth => handle_auth_edit(state, key),
+            }
+        }
+    }
+}
+
+fn handle_name_edit(state: &mut AppState, key: KeyEvent) {
+    match key.code {
+        KeyCode::Char(c) => {
+            state.name_input.insert(state.name_cursor, c);
+            state.name_cursor += 1;
+        }
+        KeyCode::Backspace => {
+            if state.name_cursor > 0 {
+                state.name_cursor -= 1;
+                state.name_input.remove(state.name_cursor);
+            }
+        }
+        KeyCode::Delete => {
+            if state.name_cursor < state.name_input.len() {
+                state.name_input.remove(state.name_cursor);
+            }
+        }
+        KeyCode::Left => {
+            if state.name_cursor > 0 {
+                state.name_cursor -= 1;
+            }
+        }
+        KeyCode::Right => {
+            if state.name_cursor < state.name_input.len() {
+                state.name_cursor += 1;
+            }
+        }
+        KeyCode::Home => {
+            state.name_cursor = 0;
+        }
+        KeyCode::End => {
+            state.name_cursor = state.name_input.len();
+        }
+        _ => {}
+    }
+}
+
+fn handle_method_edit(state: &mut AppState, key: KeyEvent) {
+    let methods = models::request::HttpMethod::all();
+    match key.code {
+        KeyCode::Up | KeyCode::Left => {
+            if state.method_input > 0 {
+                state.method_input -= 1;
+            } else {
+                state.method_input = methods.len() - 1;
+            }
+        }
+        KeyCode::Down | KeyCode::Right => {
+            state.method_input = (state.method_input + 1) % methods.len();
+        }
+        _ => {}
+    }
+}
+
+fn handle_url_edit(state: &mut AppState, key: KeyEvent) {
+    match key.code {
         KeyCode::Char(c) => {
             state.url_input.insert(state.url_cursor, c);
             state.url_cursor += 1;
@@ -223,6 +312,134 @@ fn handle_edit_mode(state: &mut AppState, key: KeyEvent) {
         }
         KeyCode::End => {
             state.url_cursor = state.url_input.len();
+        }
+        _ => {}
+    }
+}
+
+fn handle_params_edit(state: &mut AppState, key: KeyEvent) {
+    match key.code {
+        KeyCode::Up => {
+            if state.params_selected > 0 {
+                state.params_selected -= 1;
+            }
+        }
+        KeyCode::Down => {
+            if state.params_selected < state.params_input.len().saturating_sub(1) {
+                state.params_selected += 1;
+            }
+        }
+        KeyCode::Char('+') => {
+            state.add_param();
+        }
+        KeyCode::Char('-') | KeyCode::Delete => {
+            state.delete_param();
+        }
+        KeyCode::Enter => {
+            // TODO: Edit selected param key/value
+        }
+        _ => {}
+    }
+}
+
+fn handle_headers_edit(state: &mut AppState, key: KeyEvent) {
+    match key.code {
+        KeyCode::Up => {
+            if state.headers_selected > 0 {
+                state.headers_selected -= 1;
+            }
+        }
+        KeyCode::Down => {
+            if state.headers_selected < state.headers_input.len().saturating_sub(1) {
+                state.headers_selected += 1;
+            }
+        }
+        KeyCode::Char('+') => {
+            state.add_header();
+        }
+        KeyCode::Char('-') | KeyCode::Delete => {
+            state.delete_header();
+        }
+        KeyCode::Enter => {
+            // TODO: Edit selected header key/value
+        }
+        _ => {}
+    }
+}
+
+fn handle_body_edit(state: &mut AppState, key: KeyEvent) {
+    match key.code {
+        KeyCode::Char(c) => {
+            state.body_input.insert(state.body_cursor, c);
+            state.body_cursor += 1;
+        }
+        KeyCode::Backspace => {
+            if state.body_cursor > 0 {
+                state.body_cursor -= 1;
+                state.body_input.remove(state.body_cursor);
+            }
+        }
+        KeyCode::Delete => {
+            if state.body_cursor < state.body_input.len() {
+                state.body_input.remove(state.body_cursor);
+            }
+        }
+        KeyCode::Left => {
+            if state.body_cursor > 0 {
+                state.body_cursor -= 1;
+            }
+        }
+        KeyCode::Right => {
+            if state.body_cursor < state.body_input.len() {
+                state.body_cursor += 1;
+            }
+        }
+        KeyCode::Home => {
+            state.body_cursor = 0;
+        }
+        KeyCode::End => {
+            state.body_cursor = state.body_input.len();
+        }
+        KeyCode::Enter => {
+            state.body_input.insert(state.body_cursor, '\n');
+            state.body_cursor += 1;
+        }
+        _ => {}
+    }
+}
+
+fn handle_auth_edit(state: &mut AppState, key: KeyEvent) {
+    match key.code {
+        KeyCode::Char(c) => {
+            state.auth_input.insert(state.auth_cursor, c);
+            state.auth_cursor += 1;
+        }
+        KeyCode::Backspace => {
+            if state.auth_cursor > 0 {
+                state.auth_cursor -= 1;
+                state.auth_input.remove(state.auth_cursor);
+            }
+        }
+        KeyCode::Delete => {
+            if state.auth_cursor < state.auth_input.len() {
+                state.auth_input.remove(state.auth_cursor);
+            }
+        }
+        KeyCode::Left => {
+            if state.auth_cursor > 0 {
+                state.auth_cursor -= 1;
+            }
+        }
+        KeyCode::Right => {
+            if state.auth_cursor < state.auth_input.len() {
+                state.auth_cursor += 1;
+            }
+        }
+        KeyCode::Home => {
+            state.auth_cursor = 0;
+        }
+        KeyCode::End => {
+            state.auth_cursor = state.auth_input.len();
         }
         _ => {}
     }

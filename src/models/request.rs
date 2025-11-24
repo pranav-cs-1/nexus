@@ -39,7 +39,7 @@ impl HttpMethod {
         }
     }
     
-    pub fn all() -> Vec<Self> {
+    pub fn all() -> Vec<HttpMethod> {
         vec![
             HttpMethod::GET,
             HttpMethod::POST,
