@@ -192,31 +192,58 @@ async fn main() -> anyhow::Result<()> {
 fn handle_edit_mode(state: &mut AppState, key: KeyEvent) {
     match key.code {
         KeyCode::Esc => {
-            state.save_input_to_request();
-            state.input_mode = InputMode::Normal;
-            state.kv_edit_mode = app::state::KeyValueEditMode::None;
+            // If we're in key-value editing mode (editing a param/header key or value),
+            // let the specific handler deal with Esc to exit key-value editing mode
+            // Otherwise, exit the entire edit mode
+            if (state.editor_focused_field == EditorField::Params || 
+                state.editor_focused_field == EditorField::Headers) && 
+               state.kv_edit_mode != app::state::KeyValueEditMode::None {
+                // Let the specific field handler deal with Esc in key-value editing mode
+                match state.editor_focused_field {
+                    EditorField::Params => handle_params_edit(state, key),
+                    EditorField::Headers => handle_headers_edit(state, key),
+                    _ => {}
+                }
+            } else {
+                // Exit the entire edit mode
+                state.save_input_to_request();
+                state.input_mode = InputMode::Normal;
+                state.kv_edit_mode = app::state::KeyValueEditMode::None;
+            }
         }
         KeyCode::Tab => {
-            // Switch between fields in edit mode
-            state.kv_edit_mode = app::state::KeyValueEditMode::None; // Reset KV edit mode when switching fields
-            state.editor_focused_field = match state.editor_focused_field {
-                EditorField::Name => EditorField::Method,
-                EditorField::Method => EditorField::Url,
-                EditorField::Url => EditorField::Params,
-                EditorField::Params => EditorField::Headers,
-                EditorField::Headers => EditorField::Body,
-                EditorField::Body => EditorField::Auth,
-                EditorField::Auth => EditorField::Name,
-            };
-            
-            // Update the UI tab to match the focused field
-            state.editor_tab = match state.editor_focused_field {
-                EditorField::Params => app::state::EditorTab::Params,
-                EditorField::Headers => app::state::EditorTab::Headers,
-                EditorField::Body => app::state::EditorTab::Body,
-                EditorField::Auth => app::state::EditorTab::Auth,
-                _ => state.editor_tab, // Keep current tab for Name, Method, URL
-            };
+            // Check if we're in key-value editing mode for params or headers
+            if (state.editor_focused_field == EditorField::Params || 
+                state.editor_focused_field == EditorField::Headers) && 
+               state.kv_edit_mode != app::state::KeyValueEditMode::None {
+                // Let the specific field handler deal with Tab in key-value editing mode
+                match state.editor_focused_field {
+                    EditorField::Params => handle_params_edit(state, key),
+                    EditorField::Headers => handle_headers_edit(state, key),
+                    _ => {}
+                }
+            } else {
+                // Switch between fields in edit mode
+                state.kv_edit_mode = app::state::KeyValueEditMode::None; // Reset KV edit mode when switching fields
+                state.editor_focused_field = match state.editor_focused_field {
+                    EditorField::Name => EditorField::Method,
+                    EditorField::Method => EditorField::Url,
+                    EditorField::Url => EditorField::Params,
+                    EditorField::Params => EditorField::Headers,
+                    EditorField::Headers => EditorField::Body,
+                    EditorField::Body => EditorField::Auth,
+                    EditorField::Auth => EditorField::Name,
+                };
+                
+                // Update the UI tab to match the focused field
+                state.editor_tab = match state.editor_focused_field {
+                    EditorField::Params => app::state::EditorTab::Params,
+                    EditorField::Headers => app::state::EditorTab::Headers,
+                    EditorField::Body => app::state::EditorTab::Body,
+                    EditorField::Auth => app::state::EditorTab::Auth,
+                    _ => state.editor_tab, // Keep current tab for Name, Method, URL
+                };
+            }
         }
         _ => {
             match state.editor_focused_field {
