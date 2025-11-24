@@ -106,7 +106,9 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
                 (KeyCode::Char('t'), KeyModifiers::NONE) => {
-                    Action::NextEditorTab.execute(&mut state);
+                    if state.focused_panel == Panel::RequestEditor {
+                        Action::NextEditorTab.execute(&mut state);
+                    }
                 }
                 (KeyCode::Enter, KeyModifiers::NONE) => {
                     if let Some(request) = state.get_current_request().cloned() {

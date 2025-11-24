@@ -33,7 +33,14 @@ Nexus uses a 4-panel layout:
 
 ### Editor Tabs
 
-- **t** - Switch to the next tab in the Request Editor (Params → Headers → Body → Auth)
+When focused on the **Request Editor** panel:
+- **t** - Switch to the next tab (Params → Headers → Body → Auth → back to Params)
+
+Each tab shows different aspects of the request:
+- **Params** - Query parameters (e.g., `?page=1&limit=10`)
+- **Headers** - HTTP headers (e.g., `Content-Type`, `Authorization`)
+- **Body** - Request body (for POST, PUT, PATCH requests)
+- **Auth** - Authentication settings (Bearer, Basic, API Key)
 
 ## Editing URLs
 
@@ -49,6 +56,17 @@ Nexus uses a 4-panel layout:
    - **Home** - Jump to beginning of URL
    - **End** - Jump to end of URL
 4. Press **Esc** to save and exit edit mode
+
+## Viewing Request Details
+
+After selecting a request, you can view its details in the Request Editor:
+
+1. Navigate to the **Request Editor** panel using Tab
+2. Press **t** to switch between tabs:
+   - **Params** - Shows query parameters (displays "No query parameters" if none are set)
+   - **Headers** - Shows HTTP headers (displays "No headers" if none are set)
+   - **Body** - Shows request body (displays "No body" if none is set)
+   - **Auth** - Shows authentication settings
 
 ## Sending Requests
 
