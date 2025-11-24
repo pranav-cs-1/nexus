@@ -42,20 +42,58 @@ Each tab shows different aspects of the request:
 - **Body** - Request body (for POST, PUT, PATCH requests)
 - **Auth** - Authentication settings (Bearer, Basic, API Key)
 
-## Editing URLs
+## Comprehensive Request Editing
+
+Nexus supports full editing of all request components. Here's how to use the enhanced editing system:
+
+### Entering Edit Mode
 
 1. Navigate to the **Request Editor** panel using Tab
 2. Press **e** to enter edit mode
-   - The URL field title will change to show `[EDITING - ESC to finish]`
-   - A cursor will appear in the URL field
-3. Edit the URL:
-   - **Type** any character to insert at cursor position
-   - **Backspace** - Delete character before cursor
-   - **Delete** - Delete character at cursor
-   - **←/→** - Move cursor left/right
-   - **Home** - Jump to beginning of URL
-   - **End** - Jump to end of URL
-4. Press **Esc** to save and exit edit mode
+   - The title will change to show `[EDITING - ESC to save, Tab to switch fields]`
+   - The currently focused field will be highlighted
+3. Use **Tab** to cycle through editable fields:
+   - **Name** - Request name/title
+   - **Method** - HTTP method (GET, POST, PUT, etc.)
+   - **URL** - Request URL
+   - **Params** - Query parameters
+   - **Headers** - HTTP headers  
+   - **Body** - Request body content
+   - **Auth** - Authentication (Bearer token)
+
+### Field-Specific Editing
+
+#### Name & URL Fields
+- **Type** - Insert characters at cursor position
+- **Backspace** - Delete character before cursor
+- **Delete** - Delete character at cursor
+- **←/→** - Move cursor left/right
+- **Home** - Jump to beginning of line
+- **End** - Jump to end of line
+
+#### Method Selection
+- **←/→ or ↑/↓** - Cycle through HTTP methods (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS)
+
+#### Parameters & Headers
+- **↑/↓** - Navigate through existing key-value pairs
+- **+** - Add a new parameter/header pair
+- **-** or **Delete** - Remove the selected parameter/header pair
+
+#### Body Field
+- **Type** - Insert characters at cursor position
+- **Backspace/Delete** - Delete characters
+- **Arrow keys** - Move cursor
+- **Home/End** - Jump to start/end of line
+- **Enter** - Insert a new line
+
+#### Authentication
+- **Type** - Enter Bearer token value
+- **Standard text editing controls** (Backspace, Delete, Arrow keys, Home, End)
+
+### Saving Changes
+
+- Press **Esc** to save all changes and return to normal mode
+- The currently focused field is highlighted with a different border color
 
 ## Viewing Request Details
 
@@ -118,13 +156,23 @@ The application shows a loading indicator while the request is being sent.
 
 ### Actions
 - **Enter** - Send request
-- **e** - Edit URL (when in Request Editor)
+- **e** - Enter edit mode (when in Request Editor)
 - **Esc** - Save and exit edit mode
 - **n** - New request
 - **d** - Delete request
 - **y** - Duplicate request
 - **c** - New collection (when in Collections panel)
 - **x** - Delete collection (when in Collections panel)
+
+### Editing Mode (when in edit mode)
+- **Tab** - Switch between editable fields
+- **←/→ or ↑/↓** - Navigate/cycle through options (method selection)
+- **+** - Add new parameter/header pair
+- **-** or **Delete** - Remove selected parameter/header pair
+- **Enter** - Insert new line (in body field)
+- **Home/End** - Jump to start/end of line
+- **Backspace** - Delete character before cursor
+- **Delete** - Delete character at cursor
 
 ### Help & Quit
 - **?** - Toggle help popup
