@@ -208,6 +208,15 @@ fn handle_edit_mode(state: &mut AppState, key: KeyEvent) {
                 EditorField::Body => EditorField::Auth,
                 EditorField::Auth => EditorField::Name,
             };
+            
+            // Update the UI tab to match the focused field
+            state.editor_tab = match state.editor_focused_field {
+                EditorField::Params => app::state::EditorTab::Params,
+                EditorField::Headers => app::state::EditorTab::Headers,
+                EditorField::Body => app::state::EditorTab::Body,
+                EditorField::Auth => app::state::EditorTab::Auth,
+                _ => state.editor_tab, // Keep current tab for Name, Method, URL
+            };
         }
         _ => {
             match state.editor_focused_field {
@@ -332,6 +341,8 @@ fn handle_params_edit(state: &mut AppState, key: KeyEvent) {
                 }
                 KeyCode::Char('+') => {
                     state.add_param();
+                    // Automatically start editing the new parameter's key
+                    state.kv_edit_mode = KeyValueEditMode::Key;
                 }
                 KeyCode::Char('-') | KeyCode::Delete => {
                     state.delete_param();
@@ -407,6 +418,8 @@ fn handle_headers_edit(state: &mut AppState, key: KeyEvent) {
                 }
                 KeyCode::Char('+') => {
                     state.add_header();
+                    // Automatically start editing the new header's key
+                    state.kv_edit_mode = KeyValueEditMode::Key;
                 }
                 KeyCode::Char('-') | KeyCode::Delete => {
                     state.delete_header();
