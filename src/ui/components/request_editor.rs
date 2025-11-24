@@ -1,7 +1,8 @@
-use crate::app::state::{AppState, EditorTab, Panel};
+use crate::app::state::{AppState, EditorTab, InputMode, Panel};
 use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
+    text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Tabs, Widget},
 };
 
@@ -43,11 +44,46 @@ impl<'a> Widget for RequestEditor<'a> {
             .split(inner_area);
         
         if let Some(request) = self.state.get_current_request() {
-            let url_block = Block::default()
-                .title("URL")
-                .borders(Borders::ALL);
+            let is_editing_url = self.state.input_mode == InputMode::Editing 
+                && self.state.focused_panel == Panel::RequestEditor;
             
-            let url_text = Paragraph::new(request.url.as_str())
+            let url_title = if is_editing_url {
+                "URL [EDITING - ESC to finish]"
+            } else {
+                "URL [Press 'e' to edit]"
+            };
+            
+            let url_block = Block::default()
+                .title(url_title)
+                .borders(Borders::ALL)
+                .border_style(if is_editing_url {
+                    Theme::selected()
+                } else {
+                    Theme::unfocused_border()
+                });
+            
+            let url_display = if is_editing_url {
+                &self.state.url_input
+            } else {
+                &request.url
+            };
+            
+            let url_line = if is_editing_url {
+                let cursor_pos = self.state.url_cursor;
+                let before = url_display.chars().take(cursor_pos).collect::<String>();
+                let cursor_char = url_display.chars().nth(cursor_pos).unwrap_or(' ');
+                let after = url_display.chars().skip(cursor_pos + 1).collect::<String>();
+                
+                Line::from(vec![
+                    Span::raw(before),
+                    Span::styled(cursor_char.to_string(), Theme::selected()),
+                    Span::raw(after),
+                ])
+            } else {
+                Line::from(url_display.as_str())
+            };
+            
+            let url_text = Paragraph::new(url_line)
                 .block(url_block);
             url_text.render(inner_chunks[0], buf);
             

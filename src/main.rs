@@ -7,10 +7,10 @@ mod utils;
 mod export;
 mod import;
 
-use app::state::AppState;
+use app::state::{AppState, InputMode, Panel};
 use app::actions::Action;
 use crossterm::{
-    event::{self, Event, KeyCode, KeyModifiers},
+    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
@@ -67,6 +67,11 @@ async fn main() -> anyhow::Result<()> {
                 if let KeyCode::Char('?') = key.code {
                     Action::ToggleHelp.execute(&mut state);
                 }
+                continue;
+            }
+            
+            if state.input_mode == InputMode::Editing {
+                handle_edit_mode(&mut state, key);
                 continue;
             }
             
@@ -134,6 +139,12 @@ async fn main() -> anyhow::Result<()> {
                 (KeyCode::Char('y'), KeyModifiers::NONE) => {
                     Action::DuplicateRequest.execute(&mut state);
                 }
+                (KeyCode::Char('e'), KeyModifiers::NONE) => {
+                    if state.focused_panel == Panel::RequestEditor {
+                        state.load_current_request_to_input();
+                        state.input_mode = InputMode::Editing;
+                    }
+                }
                 _ => {}
             }
         }
@@ -148,4 +159,46 @@ async fn main() -> anyhow::Result<()> {
     
     Ok(())
 }
+
+fn handle_edit_mode(state: &mut AppState, key: KeyEvent) {
+    match key.code {
+        KeyCode::Esc => {
+            state.save_input_to_request();
+            state.input_mode = InputMode::Normal;
+        }
+        KeyCode::Char(c) => {
+            state.url_input.insert(state.url_cursor, c);
+            state.url_cursor += 1;
+        }
+        KeyCode::Backspace => {
+            if state.url_cursor > 0 {
+                state.url_cursor -= 1;
+                state.url_input.remove(state.url_cursor);
+            }
+        }
+        KeyCode::Delete => {
+            if state.url_cursor < state.url_input.len() {
+                state.url_input.remove(state.url_cursor);
+            }
+        }
+        KeyCode::Left => {
+            if state.url_cursor > 0 {
+                state.url_cursor -= 1;
+            }
+        }
+        KeyCode::Right => {
+            if state.url_cursor < state.url_input.len() {
+                state.url_cursor += 1;
+            }
+        }
+        KeyCode::Home => {
+            state.url_cursor = 0;
+        }
+        KeyCode::End => {
+            state.url_cursor = state.url_input.len();
+        }
+        _ => {}
+    }
+}
+
 

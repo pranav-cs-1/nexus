@@ -22,6 +22,12 @@ pub enum EditorTab {
     Auth,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum InputMode {
+    Normal,
+    Editing,
+}
+
 #[derive(Debug)]
 pub struct AppState {
     pub collections: Vec<Collection>,
@@ -38,6 +44,7 @@ pub struct AppState {
     pub editor_tab: EditorTab,
     pub show_help: bool,
     pub show_environment_selector: bool,
+    pub input_mode: InputMode,
     
     pub is_loading: bool,
     pub loading_message: String,
@@ -67,6 +74,7 @@ impl AppState {
             editor_tab: EditorTab::Params,
             show_help: false,
             show_environment_selector: false,
+            input_mode: InputMode::Normal,
             
             is_loading: false,
             loading_message: String::new(),
@@ -86,6 +94,32 @@ impl AppState {
     
     pub fn get_current_request_mut(&mut self) -> Option<&mut HttpRequest> {
         self.selected_request.and_then(|idx| self.requests.get_mut(idx))
+    }
+    
+    pub fn load_current_request_to_input(&mut self) {
+        if let Some(request) = self.get_current_request() {
+            let url = request.url.clone();
+            let body = request.body.clone().unwrap_or_default();
+            
+            self.url_input = url;
+            self.url_cursor = self.url_input.len();
+            self.body_input = body;
+            self.body_cursor = self.body_input.len();
+        }
+    }
+    
+    pub fn save_input_to_request(&mut self) {
+        let url = self.url_input.clone();
+        let body = if !self.body_input.is_empty() {
+            Some(self.body_input.clone())
+        } else {
+            None
+        };
+        
+        if let Some(request) = self.get_current_request_mut() {
+            request.url = url;
+            request.body = body;
+        }
     }
     
     pub fn active_environment(&self) -> Option<&Environment> {
