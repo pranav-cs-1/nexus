@@ -115,6 +115,11 @@ impl HttpRequest {
         self
     }
     
+    pub fn with_query_param(mut self, key: String, value: String) -> Self {
+        self.query_params.insert(key, value);
+        self
+    }
+    
     pub fn with_body(mut self, body: String) -> Self {
         self.body = Some(body);
         self

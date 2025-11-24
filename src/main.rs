@@ -51,6 +51,21 @@ async fn main() -> anyhow::Result<()> {
         .with_body(r#"{"title": "foo", "body": "bar", "userId": 1}"#.to_string())
     );
     
+    state.requests.push(
+        models::request::HttpRequest::new(
+            "Search with Params, Headers & Body".to_string(),
+            models::request::HttpMethod::POST,
+            "https://jsonplaceholder.typicode.com/posts".to_string(),
+        )
+        .with_query_param("_page".to_string(), "1".to_string())
+        .with_query_param("_limit".to_string(), "10".to_string())
+        .with_query_param("_sort".to_string(), "id".to_string())
+        .with_header("Content-Type".to_string(), "application/json".to_string())
+        .with_header("Accept".to_string(), "application/json".to_string())
+        .with_header("X-Request-ID".to_string(), "sample-123".to_string())
+        .with_body(r#"{"filter": {"userId": 1}, "fields": ["id", "title", "body"]}"#.to_string())
+    );
+    
     if !state.requests.is_empty() {
         state.selected_request = Some(0);
     }
