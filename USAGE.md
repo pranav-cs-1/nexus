@@ -78,6 +78,9 @@ Nexus supports full editing of all request components. Here's how to use the enh
 - **↑/↓** - Navigate through existing key-value pairs
 - **+** - Add a new parameter/header pair
 - **-** or **Delete** - Remove the selected parameter/header pair
+- **Enter** - Start editing the selected key-value pair
+  - **Tab** - Switch between editing key and value
+  - **Esc** - Finish editing the key-value pair
 
 #### Body Field
 - **Type** - Insert characters at cursor position
@@ -169,10 +172,16 @@ The application shows a loading indicator while the request is being sent.
 - **←/→ or ↑/↓** - Navigate/cycle through options (method selection)
 - **+** - Add new parameter/header pair
 - **-** or **Delete** - Remove selected parameter/header pair
-- **Enter** - Insert new line (in body field)
+- **Enter** - Start editing key-value pair (params/headers) or insert new line (body)
 - **Home/End** - Jump to start/end of line
 - **Backspace** - Delete character before cursor
 - **Delete** - Delete character at cursor
+
+### Key-Value Editing (when editing params/headers)
+- **Tab** - Switch between editing key and value
+- **Esc** - Finish editing and return to navigation mode
+- **Type** - Edit the key or value text
+- **Backspace** - Delete character from key or value
 
 ### Help & Quit
 - **?** - Toggle help popup
