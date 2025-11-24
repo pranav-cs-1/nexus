@@ -1,4 +1,4 @@
-use crate::app::state::{AppState, EditorTab, InputMode, Panel, EditorField};
+use crate::app::state::{AppState, EditorTab, InputMode, Panel, EditorField, KeyValueEditMode};
 use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -181,8 +181,18 @@ impl<'a> RequestEditor<'a> {
     fn render_params_content(&self, area: Rect, buf: &mut ratatui::buffer::Buffer, request: &crate::models::request::HttpRequest, is_editing: bool) {
         let is_focused = is_editing && self.state.editor_focused_field == EditorField::Params;
         
+        let title = if is_focused {
+            match self.state.kv_edit_mode {
+                KeyValueEditMode::None => "Query Parameters [+ add, - delete, ↑↓ navigate, Enter edit]",
+                KeyValueEditMode::Key => "Query Parameters [EDITING KEY - Tab to switch, Esc to finish]",
+                KeyValueEditMode::Value => "Query Parameters [EDITING VALUE - Tab to switch, Esc to finish]",
+            }
+        } else {
+            "Query Parameters"
+        };
+        
         let block = Block::default()
-            .title(if is_focused { "Query Parameters [+ to add, - to delete, ↑↓ to navigate]" } else { "Query Parameters" })
+            .title(title)
             .borders(Borders::ALL)
             .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
         
@@ -191,12 +201,24 @@ impl<'a> RequestEditor<'a> {
                 .iter()
                 .enumerate()
                 .map(|(i, (key, value))| {
-                    let style = if i == self.state.params_selected {
+                    let is_selected = i == self.state.params_selected;
+                    let style = if is_selected {
                         Theme::selected()
                     } else {
                         Style::default()
                     };
-                    ListItem::new(format!("{}: {}", key, value)).style(style)
+                    
+                    let text = if is_selected && self.state.kv_edit_mode != KeyValueEditMode::None {
+                        match self.state.kv_edit_mode {
+                            KeyValueEditMode::Key => format!("[{}]: {}", key, value),
+                            KeyValueEditMode::Value => format!("{}: [{}]", key, value),
+                            _ => format!("{}: {}", key, value),
+                        }
+                    } else {
+                        format!("{}: {}", key, value)
+                    };
+                    
+                    ListItem::new(text).style(style)
                 })
                 .collect();
             
@@ -227,8 +249,18 @@ impl<'a> RequestEditor<'a> {
     fn render_headers_content(&self, area: Rect, buf: &mut ratatui::buffer::Buffer, request: &crate::models::request::HttpRequest, is_editing: bool) {
         let is_focused = is_editing && self.state.editor_focused_field == EditorField::Headers;
         
+        let title = if is_focused {
+            match self.state.kv_edit_mode {
+                KeyValueEditMode::None => "Headers [+ add, - delete, ↑↓ navigate, Enter edit]",
+                KeyValueEditMode::Key => "Headers [EDITING KEY - Tab to switch, Esc to finish]",
+                KeyValueEditMode::Value => "Headers [EDITING VALUE - Tab to switch, Esc to finish]",
+            }
+        } else {
+            "Headers"
+        };
+        
         let block = Block::default()
-            .title(if is_focused { "Headers [+ to add, - to delete, ↑↓ to navigate]" } else { "Headers" })
+            .title(title)
             .borders(Borders::ALL)
             .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
         
@@ -237,12 +269,24 @@ impl<'a> RequestEditor<'a> {
                 .iter()
                 .enumerate()
                 .map(|(i, (key, value))| {
-                    let style = if i == self.state.headers_selected {
+                    let is_selected = i == self.state.headers_selected;
+                    let style = if is_selected {
                         Theme::selected()
                     } else {
                         Style::default()
                     };
-                    ListItem::new(format!("{}: {}", key, value)).style(style)
+                    
+                    let text = if is_selected && self.state.kv_edit_mode != KeyValueEditMode::None {
+                        match self.state.kv_edit_mode {
+                            KeyValueEditMode::Key => format!("[{}]: {}", key, value),
+                            KeyValueEditMode::Value => format!("{}: [{}]", key, value),
+                            _ => format!("{}: {}", key, value),
+                        }
+                    } else {
+                        format!("{}: {}", key, value)
+                    };
+                    
+                    ListItem::new(text).style(style)
                 })
                 .collect();
             

@@ -160,13 +160,8 @@ async fn main() -> anyhow::Result<()> {
                     if state.focused_panel == Panel::RequestEditor {
                         state.load_current_request_to_input();
                         state.input_mode = InputMode::Editing;
-                        // Set focused field based on current tab
-                        state.editor_focused_field = match state.editor_tab {
-                            app::state::EditorTab::Params => EditorField::Params,
-                            app::state::EditorTab::Headers => EditorField::Headers,
-                            app::state::EditorTab::Body => EditorField::Body,
-                            app::state::EditorTab::Auth => EditorField::Auth,
-                        };
+                        // Start with Name field
+                        state.editor_focused_field = EditorField::Name;
                     }
                 }
                 (KeyCode::Char('c'), KeyModifiers::NONE) => {
@@ -199,9 +194,11 @@ fn handle_edit_mode(state: &mut AppState, key: KeyEvent) {
         KeyCode::Esc => {
             state.save_input_to_request();
             state.input_mode = InputMode::Normal;
+            state.kv_edit_mode = app::state::KeyValueEditMode::None;
         }
         KeyCode::Tab => {
             // Switch between fields in edit mode
+            state.kv_edit_mode = app::state::KeyValueEditMode::None; // Reset KV edit mode when switching fields
             state.editor_focused_field = match state.editor_focused_field {
                 EditorField::Name => EditorField::Method,
                 EditorField::Method => EditorField::Url,
@@ -318,52 +315,152 @@ fn handle_url_edit(state: &mut AppState, key: KeyEvent) {
 }
 
 fn handle_params_edit(state: &mut AppState, key: KeyEvent) {
-    match key.code {
-        KeyCode::Up => {
-            if state.params_selected > 0 {
-                state.params_selected -= 1;
+    use app::state::KeyValueEditMode;
+    
+    match state.kv_edit_mode {
+        KeyValueEditMode::None => {
+            match key.code {
+                KeyCode::Up => {
+                    if state.params_selected > 0 {
+                        state.params_selected -= 1;
+                    }
+                }
+                KeyCode::Down => {
+                    if state.params_selected < state.params_input.len().saturating_sub(1) {
+                        state.params_selected += 1;
+                    }
+                }
+                KeyCode::Char('+') => {
+                    state.add_param();
+                }
+                KeyCode::Char('-') | KeyCode::Delete => {
+                    state.delete_param();
+                }
+                KeyCode::Enter => {
+                    if !state.params_input.is_empty() && state.params_selected < state.params_input.len() {
+                        state.kv_edit_mode = KeyValueEditMode::Key;
+                    }
+                }
+                _ => {}
             }
         }
-        KeyCode::Down => {
-            if state.params_selected < state.params_input.len().saturating_sub(1) {
-                state.params_selected += 1;
+        KeyValueEditMode::Key => {
+            match key.code {
+                KeyCode::Esc => {
+                    state.kv_edit_mode = KeyValueEditMode::None;
+                }
+                KeyCode::Tab => {
+                    state.kv_edit_mode = KeyValueEditMode::Value;
+                }
+                KeyCode::Char(c) => {
+                    if let Some((key, _)) = state.params_input.get_mut(state.params_selected) {
+                        key.push(c);
+                    }
+                }
+                KeyCode::Backspace => {
+                    if let Some((key, _)) = state.params_input.get_mut(state.params_selected) {
+                        key.pop();
+                    }
+                }
+                _ => {}
             }
         }
-        KeyCode::Char('+') => {
-            state.add_param();
+        KeyValueEditMode::Value => {
+            match key.code {
+                KeyCode::Esc => {
+                    state.kv_edit_mode = KeyValueEditMode::None;
+                }
+                KeyCode::Tab => {
+                    state.kv_edit_mode = KeyValueEditMode::Key;
+                }
+                KeyCode::Char(c) => {
+                    if let Some((_, value)) = state.params_input.get_mut(state.params_selected) {
+                        value.push(c);
+                    }
+                }
+                KeyCode::Backspace => {
+                    if let Some((_, value)) = state.params_input.get_mut(state.params_selected) {
+                        value.pop();
+                    }
+                }
+                _ => {}
+            }
         }
-        KeyCode::Char('-') | KeyCode::Delete => {
-            state.delete_param();
-        }
-        KeyCode::Enter => {
-            // TODO: Edit selected param key/value
-        }
-        _ => {}
     }
 }
 
 fn handle_headers_edit(state: &mut AppState, key: KeyEvent) {
-    match key.code {
-        KeyCode::Up => {
-            if state.headers_selected > 0 {
-                state.headers_selected -= 1;
+    use app::state::KeyValueEditMode;
+    
+    match state.kv_edit_mode {
+        KeyValueEditMode::None => {
+            match key.code {
+                KeyCode::Up => {
+                    if state.headers_selected > 0 {
+                        state.headers_selected -= 1;
+                    }
+                }
+                KeyCode::Down => {
+                    if state.headers_selected < state.headers_input.len().saturating_sub(1) {
+                        state.headers_selected += 1;
+                    }
+                }
+                KeyCode::Char('+') => {
+                    state.add_header();
+                }
+                KeyCode::Char('-') | KeyCode::Delete => {
+                    state.delete_header();
+                }
+                KeyCode::Enter => {
+                    if !state.headers_input.is_empty() && state.headers_selected < state.headers_input.len() {
+                        state.kv_edit_mode = KeyValueEditMode::Key;
+                    }
+                }
+                _ => {}
             }
         }
-        KeyCode::Down => {
-            if state.headers_selected < state.headers_input.len().saturating_sub(1) {
-                state.headers_selected += 1;
+        KeyValueEditMode::Key => {
+            match key.code {
+                KeyCode::Esc => {
+                    state.kv_edit_mode = KeyValueEditMode::None;
+                }
+                KeyCode::Tab => {
+                    state.kv_edit_mode = KeyValueEditMode::Value;
+                }
+                KeyCode::Char(c) => {
+                    if let Some((key, _)) = state.headers_input.get_mut(state.headers_selected) {
+                        key.push(c);
+                    }
+                }
+                KeyCode::Backspace => {
+                    if let Some((key, _)) = state.headers_input.get_mut(state.headers_selected) {
+                        key.pop();
+                    }
+                }
+                _ => {}
             }
         }
-        KeyCode::Char('+') => {
-            state.add_header();
+        KeyValueEditMode::Value => {
+            match key.code {
+                KeyCode::Esc => {
+                    state.kv_edit_mode = KeyValueEditMode::None;
+                }
+                KeyCode::Tab => {
+                    state.kv_edit_mode = KeyValueEditMode::Key;
+                }
+                KeyCode::Char(c) => {
+                    if let Some((_, value)) = state.headers_input.get_mut(state.headers_selected) {
+                        value.push(c);
+                    }
+                }
+                KeyCode::Backspace => {
+                    if let Some((_, value)) = state.headers_input.get_mut(state.headers_selected) {
+                        value.pop();
+                    }
+                }
+                _ => {}
+            }
         }
-        KeyCode::Char('-') | KeyCode::Delete => {
-            state.delete_header();
-        }
-        KeyCode::Enter => {
-            // TODO: Edit selected header key/value
-        }
-        _ => {}
     }
 }
 

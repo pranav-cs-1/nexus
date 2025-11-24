@@ -39,6 +39,13 @@ pub enum EditorField {
     Auth,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum KeyValueEditMode {
+    None,
+    Key,
+    Value,
+}
+
 #[derive(Debug)]
 pub struct AppState {
     pub collections: Vec<Collection>,
@@ -61,6 +68,7 @@ pub struct AppState {
     pub loading_message: String,
     
     pub editor_focused_field: EditorField,
+    pub kv_edit_mode: KeyValueEditMode,
     
     // Input buffers for editing
     pub name_input: String,
@@ -103,6 +111,7 @@ impl AppState {
             loading_message: String::new(),
             
             editor_focused_field: EditorField::Url,
+            kv_edit_mode: KeyValueEditMode::None,
             
             name_input: String::new(),
             name_cursor: 0,
