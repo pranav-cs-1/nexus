@@ -59,6 +59,19 @@ Nexus uses a 4-panel layout:
 
 The application shows a loading indicator while the request is being sent.
 
+## Managing Collections
+
+### Creating a New Collection
+
+1. Navigate to the **Collections** panel (leftmost panel)
+2. Press **c** to create a new collection
+3. The new collection will be automatically named "Collection 1", "Collection 2", etc.
+
+### Deleting a Collection
+
+1. Select the collection you want to delete in the Collections panel
+2. Press **x** to delete it
+
 ## Managing Requests
 
 ### Creating a New Request
@@ -92,6 +105,8 @@ The application shows a loading indicator while the request is being sent.
 - **n** - New request
 - **d** - Delete request
 - **y** - Duplicate request
+- **c** - New collection (when in Collections panel)
+- **x** - Delete collection (when in Collections panel)
 
 ### Help & Quit
 - **?** - Toggle help popup
@@ -114,6 +129,7 @@ These use the [JSONPlaceholder API](https://jsonplaceholder.typicode.com/) for t
 - When editing URLs, you'll see visual feedback with the cursor position
 - Response details include status code, duration, size, and formatted body
 - HTTP methods are color-coded in the request list (GET=blue, POST=green, etc.)
+- Collections help you organize requests by project or API
 
 ## Troubleshooting
 

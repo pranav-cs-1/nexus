@@ -37,6 +37,8 @@ impl Widget for HelpPopup {
             "    n                 - New request",
             "    d                 - Delete request",
             "    y                 - Duplicate request",
+            "    c                 - New collection (in collections)",
+            "    x                 - Delete collection (in collections)",
             "",
             "  Other:",
             "    ?                 - Toggle this help",

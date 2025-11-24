@@ -1,4 +1,5 @@
 use crate::app::state::AppState;
+use crate::models::collection::Collection;
 use crate::models::request::HttpRequest;
 use uuid::Uuid;
 
@@ -16,6 +17,8 @@ pub enum Action {
     NewRequest,
     DeleteRequest,
     DuplicateRequest,
+    NewCollection,
+    DeleteCollection,
     SaveRequest,
     ToggleEnvironmentSelector,
     ExportAsCurl,
@@ -55,6 +58,22 @@ impl Action {
                     new_request.name = format!("{} (copy)", new_request.name);
                     state.requests.push(new_request);
                     state.selected_request = Some(state.requests.len() - 1);
+                }
+            }
+            Action::NewCollection => {
+                let collection_num = state.collections.len() + 1;
+                let collection = Collection::new(format!("Collection {}", collection_num));
+                state.collections.push(collection);
+                state.selected_collection = Some(state.collections.len() - 1);
+            }
+            Action::DeleteCollection => {
+                if let Some(idx) = state.selected_collection {
+                    state.collections.remove(idx);
+                    if state.collections.is_empty() {
+                        state.selected_collection = None;
+                    } else if idx >= state.collections.len() {
+                        state.selected_collection = Some(state.collections.len() - 1);
+                    }
                 }
             }
             Action::ToggleEnvironmentSelector => {

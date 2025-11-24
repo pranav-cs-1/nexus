@@ -145,6 +145,16 @@ async fn main() -> anyhow::Result<()> {
                         state.input_mode = InputMode::Editing;
                     }
                 }
+                (KeyCode::Char('c'), KeyModifiers::NONE) => {
+                    if state.focused_panel == Panel::Collections {
+                        Action::NewCollection.execute(&mut state);
+                    }
+                }
+                (KeyCode::Char('x'), KeyModifiers::NONE) => {
+                    if state.focused_panel == Panel::Collections {
+                        Action::DeleteCollection.execute(&mut state);
+                    }
+                }
                 _ => {}
             }
         }
