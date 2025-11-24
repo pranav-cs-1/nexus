@@ -32,6 +32,8 @@ impl Widget for HelpPopup {
             "",
             "  Actions:",
             "    Enter             - Send request",
+            "    e                 - Edit URL (in editor)",
+            "    Esc               - Save & exit edit mode",
             "    n                 - New request",
             "    d                 - Delete request",
             "    y                 - Duplicate request",
