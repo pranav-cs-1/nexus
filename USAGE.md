@@ -26,10 +26,10 @@ Nexus uses a 4-panel layout:
 - **Tab** - Move to the next panel (Collections → Requests → Editor → Response)
 - **Shift+Tab** - Move to the previous panel
 
-### Moving Within Lists
+### Moving Within Lists and Scrolling
 
-- **j** or **↓** - Move down in the current list
-- **k** or **↑** - Move up in the current list
+- **j** or **↓** - Move down in lists (Collections, Requests) or scroll down in Response Viewer
+- **k** or **↑** - Move up in lists (Collections, Requests) or scroll up in Response Viewer
 
 ### Editor Tabs
 
@@ -88,6 +88,7 @@ Nexus supports full editing of all request components. Here's how to use the enh
 - **Arrow keys** - Move cursor
 - **Home/End** - Jump to start/end of line
 - **Enter** - Insert a new line
+- Body text automatically wraps to the editor width (no horizontal scrolling needed)
 
 #### Authentication
 - **Type** - Enter Bearer token value
@@ -117,6 +118,24 @@ After selecting a request, you can view its details in the Request Editor:
 4. The response will appear in the Response Viewer panel
 
 The application shows a loading indicator while the request is being sent.
+
+## Viewing Responses
+
+After sending a request, the response appears in the Response Viewer panel:
+
+1. Navigate to the **Response** panel using Tab
+2. Use **j** or **↓** to scroll down through the response
+3. Use **k** or **↑** to scroll up through the response
+4. The response body is automatically wrapped to fit within the panel width
+5. Long responses can be scrolled line by line
+6. The title bar shows the current scroll position
+
+Response details include:
+- Status code (color-coded: green for 2xx, blue for 3xx, yellow for 4xx, red for 5xx)
+- Status text
+- Response time in milliseconds
+- Response size in bytes
+- Formatted body (JSON responses are automatically pretty-printed)
 
 ## Managing Collections
 
@@ -202,9 +221,11 @@ These use the [JSONPlaceholder API](https://jsonplaceholder.typicode.com/) for t
 
 - The focused panel is highlighted with a different border color
 - When editing URLs, you'll see visual feedback with the cursor position
-- Response details include status code, duration, size, and formatted body
+- Response text is automatically wrapped to fit the panel width (no horizontal scrolling needed)
+- Long responses can be scrolled vertically using j/k or arrow keys when the Response panel is focused
 - HTTP methods are color-coded in the request list (GET=blue, POST=green, etc.)
 - Collections help you organize requests by project or API
+- The scroll position is reset each time you send a new request
 
 ## Troubleshooting
 

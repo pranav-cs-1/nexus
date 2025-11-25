@@ -85,6 +85,9 @@ pub struct AppState {
     pub auth_input: String,
     pub auth_cursor: usize,
     
+    // Response viewer scroll state
+    pub response_scroll: u16,
+    
     pub should_quit: bool,
 }
 
@@ -126,6 +129,8 @@ impl AppState {
             body_cursor: 0,
             auth_input: String::new(),
             auth_cursor: 0,
+            
+            response_scroll: 0,
             
             should_quit: false,
         }
@@ -326,6 +331,18 @@ impl AppState {
                 self.headers_selected = self.headers_input.len() - 1;
             }
         }
+    }
+    
+    pub fn scroll_response_down(&mut self) {
+        self.response_scroll = self.response_scroll.saturating_add(1);
+    }
+    
+    pub fn scroll_response_up(&mut self) {
+        self.response_scroll = self.response_scroll.saturating_sub(1);
+    }
+    
+    pub fn reset_response_scroll(&mut self) {
+        self.response_scroll = 0;
     }
 }
 

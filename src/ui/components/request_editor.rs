@@ -3,7 +3,7 @@ use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Tabs, Widget},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Tabs, Widget, Wrap},
     style::Style,
 };
 
@@ -322,27 +322,24 @@ impl<'a> RequestEditor<'a> {
             .borders(Borders::ALL)
             .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
         
-        let text = if is_editing {
-            let display_text = &self.state.body_input;
-            if is_focused {
-                let cursor_pos = self.state.body_cursor;
-                let before = display_text.chars().take(cursor_pos).collect::<String>();
-                let cursor_char = display_text.chars().nth(cursor_pos).unwrap_or(' ');
-                let after = display_text.chars().skip(cursor_pos + 1).collect::<String>();
-                
-                Line::from(vec![
-                    Span::raw(before),
-                    Span::styled(cursor_char.to_string(), Theme::selected()),
-                    Span::raw(after),
-                ])
-            } else {
-                Line::from(display_text.as_str())
-            }
+        let mut display_text = if is_editing {
+            self.state.body_input.clone()
         } else {
-            Line::from(request.body.as_deref().unwrap_or("No body"))
+            request
+                .body
+                .clone()
+                .unwrap_or_else(|| "No body".to_string())
         };
         
-        Paragraph::new(text).block(block).render(area, buf);
+        if is_editing && is_focused {
+            let cursor_pos = self.state.body_cursor.min(display_text.len());
+            display_text.insert(cursor_pos, '▌');
+        }
+        
+        Paragraph::new(display_text)
+            .wrap(Wrap { trim: false })
+            .block(block)
+            .render(area, buf);
     }
     
     fn render_auth_content(&self, area: Rect, buf: &mut ratatui::buffer::Buffer, request: &crate::models::request::HttpRequest, is_editing: bool) {

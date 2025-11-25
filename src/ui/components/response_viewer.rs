@@ -3,7 +3,7 @@ use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Widget},
+    widgets::{Block, Borders, Paragraph, Widget, Wrap},
 };
 
 pub struct ResponseViewer<'a> {
@@ -26,8 +26,14 @@ impl<'a> Widget for ResponseViewer<'a> {
             Theme::unfocused_border()
         };
         
+        let title = if is_focused {
+            format!("Response [↑/↓ or j/k to scroll, line {}]", self.state.response_scroll + 1)
+        } else {
+            "Response".to_string()
+        };
+        
         let block = Block::default()
-            .title("Response")
+            .title(title)
             .borders(Borders::ALL)
             .border_style(border_style);
         
@@ -59,7 +65,9 @@ impl<'a> Widget for ResponseViewer<'a> {
             status_paragraph.render(chunks[0], buf);
             
             let body = response.formatted_body();
-            let body_paragraph = Paragraph::new(body);
+            let body_paragraph = Paragraph::new(body)
+                .wrap(Wrap { trim: false })
+                .scroll((self.state.response_scroll, 0));
             body_paragraph.render(chunks[1], buf);
         } else {
             let no_response = Paragraph::new("No response yet\n\nPress Enter to send request")

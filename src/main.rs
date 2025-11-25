@@ -110,6 +110,7 @@ async fn main() -> anyhow::Result<()> {
                     match state.focused_panel {
                         app::state::Panel::Collections => Action::NextCollection.execute(&mut state),
                         app::state::Panel::Requests => Action::NextRequest.execute(&mut state),
+                        app::state::Panel::Response => state.scroll_response_down(),
                         _ => {}
                     }
                 }
@@ -117,6 +118,7 @@ async fn main() -> anyhow::Result<()> {
                     match state.focused_panel {
                         app::state::Panel::Collections => Action::PrevCollection.execute(&mut state),
                         app::state::Panel::Requests => Action::PrevRequest.execute(&mut state),
+                        app::state::Panel::Response => state.scroll_response_up(),
                         _ => {}
                     }
                 }
@@ -129,6 +131,7 @@ async fn main() -> anyhow::Result<()> {
                     if let Some(request) = state.get_current_request().cloned() {
                         state.is_loading = true;
                         state.loading_message = format!("Sending {} request...", request.method.as_str());
+                        state.reset_response_scroll();
                         
                         terminal.draw(|frame| {
                             ui::app::UI::draw(frame, &state);
