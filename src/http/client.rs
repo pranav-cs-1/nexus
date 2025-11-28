@@ -3,6 +3,7 @@ use anyhow::Result;
 use std::time::Instant;
 use uuid::Uuid;
 
+#[derive(Clone)]
 pub struct HttpClient {
     client: reqwest::Client,
 }
