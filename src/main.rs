@@ -7,12 +7,13 @@ mod utils;
 use app::state::{AppState, InputMode, Panel, EditorField};
 use app::actions::Action;
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
+    event::{self, Event, KeyCode, KeyEvent, KeyModifiers, poll},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
+use tokio::sync::mpsc;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -109,13 +110,21 @@ async fn main() -> anyhow::Result<()> {
     }
     
     let http_client = http::client::HttpClient::new()?;
+    let (response_tx, mut response_rx) = mpsc::channel(32);
     
     loop {
+        while let Ok(response) = response_rx.try_recv() {
+            state.current_response = Some(response);
+            state.is_loading = false;
+            state.loading_message.clear();
+        }
+        
         terminal.draw(|frame| {
             ui::app::UI::draw(frame, &state);
         })?;
         
-        if let Event::Key(key) = event::read()? {
+        if poll(std::time::Duration::from_millis(100))? {
+            if let Event::Key(key) = event::read()? {
             if state.show_help {
                 if let KeyCode::Char('?') = key.code {
                     Action::ToggleHelp.execute(&mut state);
@@ -172,25 +181,23 @@ async fn main() -> anyhow::Result<()> {
                 }
                 (KeyCode::Enter, KeyModifiers::NONE) => {
                     if let Some(request) = state.get_current_request().cloned() {
-                        state.is_loading = true;
-                        state.loading_message = format!("Sending {} request...", request.method.as_str());
-                        state.reset_response_scroll();
-                        
-                        terminal.draw(|frame| {
-                            ui::app::UI::draw(frame, &state);
-                        })?;
-                        
-                        match http_client.execute(&request).await {
-                            Ok(response) => {
-                                state.current_response = Some(response);
-                            }
-                            Err(e) => {
-                                state.loading_message = format!("Error: {}", e);
-                            }
+                        if !state.is_loading {
+                            state.is_loading = true;
+                            state.loading_message = format!("Sending {} request...", request.method.as_str());
+                            state.reset_response_scroll();
+                            
+                            let client = http_client.clone();
+                            let tx = response_tx.clone();
+                            
+                            tokio::spawn(async move {
+                                match client.execute(&request).await {
+                                    Ok(response) => {
+                                        let _ = tx.send(response).await;
+                                    }
+                                    Err(_) => {}
+                                }
+                            });
                         }
-                        
-                        state.is_loading = false;
-                        state.loading_message.clear();
                     }
                 }
                 (KeyCode::Char('n'), KeyModifiers::NONE) => {
@@ -225,6 +232,7 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
                 _ => {}
+            }
             }
         }
         
