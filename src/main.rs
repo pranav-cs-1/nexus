@@ -14,6 +14,7 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use tokio::sync::mpsc;
+use uuid::Uuid;
 
 enum HttpResult {
     Success(models::response::HttpResponse),
@@ -122,10 +123,24 @@ async fn main() -> anyhow::Result<()> {
             match result {
                 HttpResult::Success(response) => {
                     state.current_response = Some(response);
+                    state.loading_message.clear();
                 }
                 HttpResult::Error(error_msg) => {
-                    state.current_response = None;
-                    state.loading_message = format!("Error: {}", error_msg);
+                    let error_response = models::response::HttpResponse {
+                        id: Uuid::new_v4(),
+                        request_id: Uuid::new_v4(),
+                        status_code: 0,
+                        status_text: "Request Failed".to_string(),
+                        headers: std::collections::HashMap::new(),
+                        body: Vec::new(),
+                        body_text: Some(error_msg),
+                        duration_ms: 0,
+                        size_bytes: 0,
+                        timestamp: chrono::Utc::now(),
+                        error: None,
+                    };
+                    state.current_response = Some(error_response);
+                    state.loading_message.clear();
                 }
             }
             state.is_loading = false;
