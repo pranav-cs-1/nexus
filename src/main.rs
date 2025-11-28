@@ -8,12 +8,19 @@ mod utils;
 use app::state::{AppState, InputMode, Panel, EditorField};
 use app::actions::Action;
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
+    event::{self, Event, KeyCode, KeyEvent, KeyModifiers, poll},
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
+use tokio::sync::mpsc;
+use uuid::Uuid;
+
+enum HttpResult {
+    Success(models::response::HttpResponse),
+    Error(String),
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -130,13 +137,42 @@ async fn main() -> anyhow::Result<()> {
     }
     
     let http_client = http::client::HttpClient::new()?;
+    let (response_tx, mut response_rx) = mpsc::channel::<HttpResult>(32);
     
     loop {
+        while let Ok(result) = response_rx.try_recv() {
+            match result {
+                HttpResult::Success(response) => {
+                    state.current_response = Some(response);
+                    state.loading_message.clear();
+                }
+                HttpResult::Error(error_msg) => {
+                    let error_response = models::response::HttpResponse {
+                        id: Uuid::new_v4(),
+                        request_id: Uuid::new_v4(),
+                        status_code: 0,
+                        status_text: "Request Failed".to_string(),
+                        headers: std::collections::HashMap::new(),
+                        body: Vec::new(),
+                        body_text: Some(error_msg),
+                        duration_ms: 0,
+                        size_bytes: 0,
+                        timestamp: chrono::Utc::now(),
+                        error: None,
+                    };
+                    state.current_response = Some(error_response);
+                    state.loading_message.clear();
+                }
+            }
+            state.is_loading = false;
+        }
+        
         terminal.draw(|frame| {
             ui::app::UI::draw(frame, &state);
         })?;
         
-        if let Event::Key(key) = event::read()? {
+        if poll(std::time::Duration::from_millis(100))? {
+            if let Event::Key(key) = event::read()? {
             if state.show_help {
                 if let KeyCode::Char('?') = key.code {
                     Action::ToggleHelp.execute(&mut state);
@@ -193,25 +229,23 @@ async fn main() -> anyhow::Result<()> {
                 }
                 (KeyCode::Enter, KeyModifiers::NONE) => {
                     if let Some(request) = state.get_current_request().cloned() {
-                        state.is_loading = true;
-                        state.loading_message = format!("Sending {} request...", request.method.as_str());
-                        state.reset_response_scroll();
-                        
-                        terminal.draw(|frame| {
-                            ui::app::UI::draw(frame, &state);
-                        })?;
-                        
-                        match http_client.execute(&request).await {
-                            Ok(response) => {
-                                state.current_response = Some(response);
-                            }
-                            Err(e) => {
-                                state.loading_message = format!("Error: {}", e);
-                            }
+                        if !state.is_loading {
+                            state.is_loading = true;
+                            state.loading_message = format!("Sending {} request...", request.method.as_str());
+                            state.reset_response_scroll();
+                            state.current_response = None;
+                            
+                            let client = http_client.clone();
+                            let tx = response_tx.clone();
+                            
+                            tokio::spawn(async move {
+                                let result = match client.execute(&request).await {
+                                    Ok(response) => HttpResult::Success(response),
+                                    Err(e) => HttpResult::Error(e.to_string()),
+                                };
+                                let _ = tx.send(result).await;
+                            });
                         }
-                        
-                        state.is_loading = false;
-                        state.loading_message.clear();
                     }
                 }
                 (KeyCode::Char('n'), KeyModifiers::NONE) => {
@@ -268,6 +302,7 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
                 _ => {}
+            }
             }
         }
         
