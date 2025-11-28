@@ -1,6 +1,6 @@
 use crate::app::state::{AppState, Panel};
 use crate::ui::theme::Theme;
-use crate::models::request::HttpMethod;
+use crate::models::request::{HttpMethod, HttpRequest};
 use ratatui::{
     layout::Rect,
     text::{Line, Span},
@@ -43,13 +43,32 @@ impl<'a> Widget for RequestList<'a> {
             .borders(Borders::ALL)
             .border_style(border_style);
         
-        let items: Vec<ListItem> = self
+        let selected_collection_id = self.state.selected_collection
+            .and_then(|idx| self.state.collections.get(idx))
+            .map(|c| c.id);
+        
+        let filtered_requests: Vec<(usize, &HttpRequest)> = self
             .state
             .requests
             .iter()
             .enumerate()
-            .map(|(idx, request)| {
-                let is_selected = Some(idx) == self.state.selected_request;
+            .filter(|(_, request)| {
+                match (selected_collection_id, request.collection_id) {
+                    (Some(selected_id), Some(request_id)) => selected_id == request_id,
+                    (None, None) => true,
+                    _ => false,
+                }
+            })
+            .collect();
+        
+        let selected_request_id = self.state.selected_request
+            .and_then(|idx| self.state.requests.get(idx))
+            .map(|r| r.id);
+        
+        let items: Vec<ListItem> = filtered_requests
+            .iter()
+            .map(|(_original_idx, request)| {
+                let is_selected = Some(request.id) == selected_request_id;
                 let method_str = format!("{:7}", request.method.as_str());
                 
                 let line = if is_selected {

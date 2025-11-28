@@ -29,58 +29,65 @@ async fn main() -> anyhow::Result<()> {
     
     let mut state = AppState::new();
     
-    state.requests.push(models::request::HttpRequest::new(
+    let default_collection = models::collection::Collection::new("Collection 1".to_string());
+    let collection_id = default_collection.id;
+    state.collections.push(default_collection);
+    state.selected_collection = Some(0);
+    
+    let mut request1 = models::request::HttpRequest::new(
         "Get JSONPlaceholder Post".to_string(),
         models::request::HttpMethod::GET,
         "https://jsonplaceholder.typicode.com/posts/1".to_string(),
-    ));
+    );
+    request1.collection_id = Some(collection_id);
+    state.requests.push(request1);
     
-    state.requests.push(models::request::HttpRequest::new(
+    let mut request2 = models::request::HttpRequest::new(
         "List JSONPlaceholder Posts".to_string(),
         models::request::HttpMethod::GET,
         "https://jsonplaceholder.typicode.com/posts".to_string(),
-    ));
-    
-    state.requests.push(
-        models::request::HttpRequest::new(
-            "Create Post".to_string(),
-            models::request::HttpMethod::POST,
-            "https://jsonplaceholder.typicode.com/posts".to_string(),
-        )
-        .with_header("Content-Type".to_string(), "application/json".to_string())
-        .with_body(r#"{"title": "foo", "body": "bar", "userId": 1}"#.to_string())
     );
+    request2.collection_id = Some(collection_id);
+    state.requests.push(request2);
     
-    state.requests.push(
-        models::request::HttpRequest::new(
-            "Search with Params, Headers & Body".to_string(),
-            models::request::HttpMethod::POST,
-            "https://jsonplaceholder.typicode.com/posts".to_string(),
-        )
-        .with_query_param("_page".to_string(), "1".to_string())
-        .with_query_param("_limit".to_string(), "10".to_string())
-        .with_query_param("_sort".to_string(), "id".to_string())
-        .with_header("Content-Type".to_string(), "application/json".to_string())
-        .with_header("Accept".to_string(), "application/json".to_string())
-        .with_header("X-Request-ID".to_string(), "sample-123".to_string())
-        .with_body(r#"{"filter": {"userId": 1}, "fields": ["id", "title", "body"]}"#.to_string())
-    );
+    let mut request3 = models::request::HttpRequest::new(
+        "Create Post".to_string(),
+        models::request::HttpMethod::POST,
+        "https://jsonplaceholder.typicode.com/posts".to_string(),
+    )
+    .with_header("Content-Type".to_string(), "application/json".to_string())
+    .with_body(r#"{"title": "foo", "body": "bar", "userId": 1}"#.to_string());
+    request3.collection_id = Some(collection_id);
+    state.requests.push(request3);
     
-    // Comprehensive test request
-    state.requests.push(
-        models::request::HttpRequest::new(
-            "TEST: Full Editor Test (No Auth)".to_string(),
-            models::request::HttpMethod::PUT,
-            "https://httpbin.org/anything".to_string(),
-        )
-        .with_query_param("test_param_1".to_string(), "value_one".to_string())
-        .with_query_param("test_param_2".to_string(), "value_two".to_string())
-        .with_query_param("number".to_string(), "42".to_string())
-        .with_header("Content-Type".to_string(), "application/json".to_string())
-        .with_header("Accept".to_string(), "application/json".to_string())
-        .with_header("X-Test-Header".to_string(), "test-value-123".to_string())
-        .with_header("User-Agent".to_string(), "Nexus-TUI-Tester/1.0".to_string())
-        .with_body(r#"{
+    let mut request4 = models::request::HttpRequest::new(
+        "Search with Params, Headers & Body".to_string(),
+        models::request::HttpMethod::POST,
+        "https://jsonplaceholder.typicode.com/posts".to_string(),
+    )
+    .with_query_param("_page".to_string(), "1".to_string())
+    .with_query_param("_limit".to_string(), "10".to_string())
+    .with_query_param("_sort".to_string(), "id".to_string())
+    .with_header("Content-Type".to_string(), "application/json".to_string())
+    .with_header("Accept".to_string(), "application/json".to_string())
+    .with_header("X-Request-ID".to_string(), "sample-123".to_string())
+    .with_body(r#"{"filter": {"userId": 1}, "fields": ["id", "title", "body"]}"#.to_string());
+    request4.collection_id = Some(collection_id);
+    state.requests.push(request4);
+    
+    let mut request5 = models::request::HttpRequest::new(
+        "TEST: Full Editor Test (No Auth)".to_string(),
+        models::request::HttpMethod::PUT,
+        "https://httpbin.org/anything".to_string(),
+    )
+    .with_query_param("test_param_1".to_string(), "value_one".to_string())
+    .with_query_param("test_param_2".to_string(), "value_two".to_string())
+    .with_query_param("number".to_string(), "42".to_string())
+    .with_header("Content-Type".to_string(), "application/json".to_string())
+    .with_header("Accept".to_string(), "application/json".to_string())
+    .with_header("X-Test-Header".to_string(), "test-value-123".to_string())
+    .with_header("User-Agent".to_string(), "Nexus-TUI-Tester/1.0".to_string())
+    .with_body(r#"{
   "test": true,
   "message": "This is a comprehensive test",
   "data": {
@@ -96,8 +103,9 @@ async fn main() -> anyhow::Result<()> {
       }
     }
   }
-}"#.to_string())
-    );
+}"#.to_string());
+    request5.collection_id = Some(collection_id);
+    state.requests.push(request5);
     
     if !state.requests.is_empty() {
         state.selected_request = Some(0);

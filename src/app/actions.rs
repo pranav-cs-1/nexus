@@ -37,7 +37,12 @@ impl Action {
             Action::PrevCollection => state.prev_collection(),
             Action::NextEditorTab => state.next_editor_tab(),
             Action::NewRequest => {
-                let request = HttpRequest::default();
+                let mut request = HttpRequest::default();
+                if let Some(collection_idx) = state.selected_collection {
+                    if let Some(collection) = state.collections.get(collection_idx) {
+                        request.collection_id = Some(collection.id);
+                    }
+                }
                 state.requests.push(request);
                 state.selected_request = Some(state.requests.len() - 1);
             }
@@ -49,6 +54,7 @@ impl Action {
                     } else if idx >= state.requests.len() {
                         state.selected_request = Some(state.requests.len() - 1);
                     }
+                    state.clear_input_buffers();
                 }
             }
             Action::DuplicateRequest => {
@@ -56,6 +62,11 @@ impl Action {
                     let mut new_request = request.clone();
                     new_request.id = Uuid::new_v4();
                     new_request.name = format!("{} (copy)", new_request.name);
+                    if let Some(collection_idx) = state.selected_collection {
+                        if let Some(collection) = state.collections.get(collection_idx) {
+                            new_request.collection_id = Some(collection.id);
+                        }
+                    }
                     state.requests.push(new_request);
                     state.selected_request = Some(state.requests.len() - 1);
                 }
@@ -65,6 +76,7 @@ impl Action {
                 let collection = Collection::new(format!("Collection {}", collection_num));
                 state.collections.push(collection);
                 state.selected_collection = Some(state.collections.len() - 1);
+                state.update_selected_request_for_collection();
             }
             Action::DeleteCollection => {
                 if let Some(idx) = state.selected_collection {

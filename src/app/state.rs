@@ -273,9 +273,11 @@ impl AppState {
         if let Some(idx) = self.selected_request {
             if idx < self.requests.len().saturating_sub(1) {
                 self.selected_request = Some(idx + 1);
+                self.clear_input_buffers();
             }
         } else if !self.requests.is_empty() {
             self.selected_request = Some(0);
+            self.clear_input_buffers();
         }
     }
     
@@ -283,6 +285,7 @@ impl AppState {
         if let Some(idx) = self.selected_request {
             if idx > 0 {
                 self.selected_request = Some(idx - 1);
+                self.clear_input_buffers();
             }
         }
     }
@@ -291,9 +294,11 @@ impl AppState {
         if let Some(idx) = self.selected_collection {
             if idx < self.collections.len().saturating_sub(1) {
                 self.selected_collection = Some(idx + 1);
+                self.update_selected_request_for_collection();
             }
         } else if !self.collections.is_empty() {
             self.selected_collection = Some(0);
+            self.update_selected_request_for_collection();
         }
     }
     
@@ -301,8 +306,47 @@ impl AppState {
         if let Some(idx) = self.selected_collection {
             if idx > 0 {
                 self.selected_collection = Some(idx - 1);
+                self.update_selected_request_for_collection();
             }
         }
+    }
+    
+    pub fn update_selected_request_for_collection(&mut self) {
+        if let Some(collection_idx) = self.selected_collection {
+            if let Some(collection) = self.collections.get(collection_idx) {
+                let collection_id = collection.id;
+                if let Some(first_request_idx) = self.requests.iter().position(|r| r.collection_id == Some(collection_id)) {
+                    self.selected_request = Some(first_request_idx);
+                } else {
+                    self.selected_request = None;
+                }
+            }
+        } else {
+            if let Some(first_request_idx) = self.requests.iter().position(|r| r.collection_id.is_none()) {
+                self.selected_request = Some(first_request_idx);
+            } else {
+                self.selected_request = None;
+            }
+        }
+        self.clear_input_buffers();
+    }
+    
+    pub fn clear_input_buffers(&mut self) {
+        self.name_input.clear();
+        self.name_cursor = 0;
+        self.method_input = 0;
+        self.url_input.clear();
+        self.url_cursor = 0;
+        self.params_input.clear();
+        self.params_selected = 0;
+        self.headers_input.clear();
+        self.headers_selected = 0;
+        self.body_input.clear();
+        self.body_cursor = 0;
+        self.auth_input.clear();
+        self.auth_cursor = 0;
+        self.input_mode = InputMode::Normal;
+        self.kv_edit_mode = KeyValueEditMode::None;
     }
     
     pub fn add_param(&mut self) {
