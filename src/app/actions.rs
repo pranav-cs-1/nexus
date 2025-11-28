@@ -19,6 +19,7 @@ pub enum Action {
     NewCollection,
     DeleteCollection,
     EditCollection,
+    CopyResponse,
 }
 
 impl Action {
@@ -87,6 +88,14 @@ impl Action {
             }
             Action::EditCollection => {
                 state.start_editing_collection();
+            }
+            Action::CopyResponse => {
+                if let Some(response) = &state.current_response {
+                    let text_to_copy = response.formatted_body();
+                    if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                        let _ = clipboard.set_text(text_to_copy);
+                    }
+                }
             }
         }
     }

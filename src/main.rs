@@ -215,6 +215,8 @@ async fn main() -> anyhow::Result<()> {
                 (KeyCode::Char('c'), KeyModifiers::NONE) => {
                     if state.focused_panel == Panel::Collections {
                         Action::NewCollection.execute(&mut state);
+                    } else if state.focused_panel == Panel::Response {
+                        Action::CopyResponse.execute(&mut state);
                     }
                 }
                 (KeyCode::Char('x'), KeyModifiers::NONE) => {

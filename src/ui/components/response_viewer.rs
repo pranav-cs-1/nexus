@@ -27,7 +27,7 @@ impl<'a> Widget for ResponseViewer<'a> {
         };
         
         let title = if is_focused {
-            format!("Response [↑/↓ or j/k to scroll, line {}]", self.state.response_scroll + 1)
+            format!("Response [↑/↓ scroll, c: copy | line {}]", self.state.response_scroll + 1)
         } else {
             "Response".to_string()
         };
