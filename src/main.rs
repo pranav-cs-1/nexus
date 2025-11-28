@@ -131,6 +131,11 @@ async fn main() -> anyhow::Result<()> {
                 continue;
             }
             
+            if state.editing_collection {
+                handle_collection_edit_mode(&mut state, key);
+                continue;
+            }
+            
             match (key.code, key.modifiers) {
                 (KeyCode::Char('q'), KeyModifiers::NONE) => {
                     Action::Quit.execute(&mut state);
@@ -206,6 +211,8 @@ async fn main() -> anyhow::Result<()> {
                         state.input_mode = InputMode::Editing;
                         // Start with Name field
                         state.editor_focused_field = EditorField::Name;
+                    } else if state.focused_panel == Panel::Collections {
+                        Action::EditCollection.execute(&mut state);
                     }
                 }
                 (KeyCode::Char('c'), KeyModifiers::NONE) => {
@@ -621,6 +628,49 @@ fn handle_auth_edit(state: &mut AppState, key: KeyEvent) {
         }
         KeyCode::End => {
             state.auth_cursor = state.auth_input.len();
+        }
+        _ => {}
+    }
+}
+
+fn handle_collection_edit_mode(state: &mut AppState, key: KeyEvent) {
+    match key.code {
+        KeyCode::Esc => {
+            state.cancel_collection_editing();
+        }
+        KeyCode::Enter => {
+            state.save_collection_name();
+        }
+        KeyCode::Char(c) => {
+            state.collection_name_input.insert(state.collection_name_cursor, c);
+            state.collection_name_cursor += 1;
+        }
+        KeyCode::Backspace => {
+            if state.collection_name_cursor > 0 {
+                state.collection_name_cursor -= 1;
+                state.collection_name_input.remove(state.collection_name_cursor);
+            }
+        }
+        KeyCode::Delete => {
+            if state.collection_name_cursor < state.collection_name_input.len() {
+                state.collection_name_input.remove(state.collection_name_cursor);
+            }
+        }
+        KeyCode::Left => {
+            if state.collection_name_cursor > 0 {
+                state.collection_name_cursor -= 1;
+            }
+        }
+        KeyCode::Right => {
+            if state.collection_name_cursor < state.collection_name_input.len() {
+                state.collection_name_cursor += 1;
+            }
+        }
+        KeyCode::Home => {
+            state.collection_name_cursor = 0;
+        }
+        KeyCode::End => {
+            state.collection_name_cursor = state.collection_name_input.len();
         }
         _ => {}
     }

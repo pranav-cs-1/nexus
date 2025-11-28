@@ -145,6 +145,13 @@ Response details include:
 2. Press **c** to create a new collection
 3. The new collection will be automatically named "Collection 1", "Collection 2", etc.
 
+### Editing a Collection Name
+
+1. Select the collection you want to rename in the Collections panel
+2. Press **e** to start editing the name
+3. Type the new name
+4. Press **Enter** to save or **Esc** to cancel
+
 ### Deleting a Collection
 
 1. Select the collection you want to delete in the Collections panel
@@ -184,6 +191,7 @@ Response details include:
 - **d** - Delete request
 - **y** - Duplicate request
 - **c** - New collection (when in Collections panel)
+- **e** - Edit collection name (when in Collections panel)
 - **x** - Delete collection (when in Collections panel)
 
 ### Editing Mode (when in edit mode)

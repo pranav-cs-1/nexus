@@ -19,6 +19,7 @@ pub enum Action {
     DuplicateRequest,
     NewCollection,
     DeleteCollection,
+    EditCollection,
     SaveRequest,
     ToggleEnvironmentSelector,
     ExportAsCurl,
@@ -87,6 +88,9 @@ impl Action {
                         state.selected_collection = Some(state.collections.len() - 1);
                     }
                 }
+            }
+            Action::EditCollection => {
+                state.start_editing_collection();
             }
             Action::ToggleEnvironmentSelector => {
                 state.show_environment_selector = !state.show_environment_selector;

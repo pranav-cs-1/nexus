@@ -26,8 +26,10 @@ impl<'a> Widget for CollectionList<'a> {
             Theme::unfocused_border()
         };
         
+        let title = "Collections";
+        
         let block = Block::default()
-            .title("Collections")
+            .title(title)
             .borders(Borders::ALL)
             .border_style(border_style);
         
@@ -37,15 +39,34 @@ impl<'a> Widget for CollectionList<'a> {
             .iter()
             .enumerate()
             .map(|(idx, collection)| {
-                let style = if Some(idx) == self.state.selected_collection {
+                let is_selected = Some(idx) == self.state.selected_collection;
+                let is_editing = is_selected && self.state.editing_collection;
+                
+                let style = if is_selected {
                     Theme::selected()
                 } else {
                     Theme::default()
                 };
                 
-                ListItem::new(Line::from(vec![
-                    Span::styled(&collection.name, style),
-                ]))
+                let text = if is_editing {
+                    let display_text = &self.state.collection_name_input;
+                    let cursor_pos = self.state.collection_name_cursor;
+                    let before = display_text.chars().take(cursor_pos).collect::<String>();
+                    let cursor_char = display_text.chars().nth(cursor_pos).unwrap_or(' ');
+                    let after = display_text.chars().skip(cursor_pos + 1).collect::<String>();
+                    
+                    Line::from(vec![
+                        Span::raw(before),
+                        Span::styled(cursor_char.to_string(), Theme::selected()),
+                        Span::raw(after),
+                    ])
+                } else {
+                    Line::from(vec![
+                        Span::styled(&collection.name, style),
+                    ])
+                };
+                
+                ListItem::new(text)
             })
             .collect();
         

@@ -70,6 +70,11 @@ pub struct AppState {
     pub editor_focused_field: EditorField,
     pub kv_edit_mode: KeyValueEditMode,
     
+    // Collection editing
+    pub editing_collection: bool,
+    pub collection_name_input: String,
+    pub collection_name_cursor: usize,
+    
     // Input buffers for editing
     pub name_input: String,
     pub name_cursor: usize,
@@ -115,6 +120,10 @@ impl AppState {
             
             editor_focused_field: EditorField::Url,
             kv_edit_mode: KeyValueEditMode::None,
+            
+            editing_collection: false,
+            collection_name_input: String::new(),
+            collection_name_cursor: 0,
             
             name_input: String::new(),
             name_cursor: 0,
@@ -188,7 +197,7 @@ impl AppState {
     
     pub fn save_input_to_request(&mut self) {
         // Clone all the input values first to avoid borrow checker issues
-        let name = self.name_input.clone();
+        let name = self.name_input.trim().to_string();
         let method_idx = self.method_input;
         let url = self.url_input.clone();
         let params = self.params_input.clone();
@@ -197,7 +206,9 @@ impl AppState {
         let auth = self.auth_input.clone();
         
         if let Some(request) = self.get_current_request_mut() {
-            request.name = name;
+            if !name.is_empty() {
+                request.name = name;
+            }
             
             if let Some(method) = crate::models::request::HttpMethod::all().get(method_idx) {
                 request.method = method.clone();
@@ -347,6 +358,36 @@ impl AppState {
         self.auth_cursor = 0;
         self.input_mode = InputMode::Normal;
         self.kv_edit_mode = KeyValueEditMode::None;
+    }
+    
+    pub fn start_editing_collection(&mut self) {
+        if let Some(idx) = self.selected_collection {
+            if let Some(collection) = self.collections.get(idx) {
+                self.editing_collection = true;
+                self.collection_name_input = collection.name.clone();
+                self.collection_name_cursor = self.collection_name_input.len();
+            }
+        }
+    }
+    
+    pub fn save_collection_name(&mut self) {
+        if let Some(idx) = self.selected_collection {
+            if let Some(collection) = self.collections.get_mut(idx) {
+                let trimmed_name = self.collection_name_input.trim();
+                if !trimmed_name.is_empty() {
+                    collection.name = trimmed_name.to_string();
+                }
+            }
+        }
+        self.editing_collection = false;
+        self.collection_name_input.clear();
+        self.collection_name_cursor = 0;
+    }
+    
+    pub fn cancel_collection_editing(&mut self) {
+        self.editing_collection = false;
+        self.collection_name_input.clear();
+        self.collection_name_cursor = 0;
     }
     
     pub fn add_param(&mut self) {
