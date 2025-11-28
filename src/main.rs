@@ -15,6 +15,11 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use tokio::sync::mpsc;
 
+enum HttpResult {
+    Success(models::response::HttpResponse),
+    Error(String),
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     utils::logger::init()?;
@@ -110,13 +115,20 @@ async fn main() -> anyhow::Result<()> {
     }
     
     let http_client = http::client::HttpClient::new()?;
-    let (response_tx, mut response_rx) = mpsc::channel(32);
+    let (response_tx, mut response_rx) = mpsc::channel::<HttpResult>(32);
     
     loop {
-        while let Ok(response) = response_rx.try_recv() {
-            state.current_response = Some(response);
+        while let Ok(result) = response_rx.try_recv() {
+            match result {
+                HttpResult::Success(response) => {
+                    state.current_response = Some(response);
+                }
+                HttpResult::Error(error_msg) => {
+                    state.current_response = None;
+                    state.loading_message = format!("Error: {}", error_msg);
+                }
+            }
             state.is_loading = false;
-            state.loading_message.clear();
         }
         
         terminal.draw(|frame| {
@@ -185,17 +197,17 @@ async fn main() -> anyhow::Result<()> {
                             state.is_loading = true;
                             state.loading_message = format!("Sending {} request...", request.method.as_str());
                             state.reset_response_scroll();
+                            state.current_response = None;
                             
                             let client = http_client.clone();
                             let tx = response_tx.clone();
                             
                             tokio::spawn(async move {
-                                match client.execute(&request).await {
-                                    Ok(response) => {
-                                        let _ = tx.send(response).await;
-                                    }
-                                    Err(_) => {}
-                                }
+                                let result = match client.execute(&request).await {
+                                    Ok(response) => HttpResult::Success(response),
+                                    Err(e) => HttpResult::Error(e.to_string()),
+                                };
+                                let _ = tx.send(result).await;
                             });
                         }
                     }
