@@ -1,7 +1,5 @@
 use crate::models::{
     collection::Collection,
-    environment::Environment,
-    history::HistoryEntry,
     request::HttpRequest,
     response::HttpResponse,
 };
@@ -51,17 +49,13 @@ pub struct AppState {
     pub collections: Vec<Collection>,
     pub requests: Vec<HttpRequest>,
     pub current_response: Option<HttpResponse>,
-    pub history: Vec<HistoryEntry>,
-    pub environments: Vec<Environment>,
     
     pub selected_collection: Option<usize>,
     pub selected_request: Option<usize>,
-    pub selected_history: Option<usize>,
     
     pub focused_panel: Panel,
     pub editor_tab: EditorTab,
     pub show_help: bool,
-    pub show_environment_selector: bool,
     pub input_mode: InputMode,
     
     pub is_loading: bool,
@@ -102,17 +96,13 @@ impl AppState {
             collections: Vec::new(),
             requests: Vec::new(),
             current_response: None,
-            history: Vec::new(),
-            environments: Vec::new(),
             
             selected_collection: None,
             selected_request: None,
-            selected_history: None,
             
             focused_panel: Panel::Collections,
             editor_tab: EditorTab::Params,
             show_help: false,
-            show_environment_selector: false,
             input_mode: InputMode::Normal,
             
             is_loading: false,
@@ -246,9 +236,6 @@ impl AppState {
         }
     }
     
-    pub fn active_environment(&self) -> Option<&Environment> {
-        self.environments.iter().find(|e| e.is_active)
-    }
     
     pub fn next_panel(&mut self) {
         use Panel::*;

@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use crate::models::request::HttpRequest;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Collection {
@@ -24,9 +23,4 @@ impl Collection {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct CollectionWithRequests {
-    pub collection: Collection,
-    pub requests: Vec<HttpRequest>,
-}
 

@@ -18,9 +18,6 @@ pub struct HttpResponse {
 }
 
 impl HttpResponse {
-    pub fn success(&self) -> bool {
-        self.status_code >= 200 && self.status_code < 300
-    }
     
     pub fn get_content_type(&self) -> Option<&String> {
         self.headers.get("content-type")

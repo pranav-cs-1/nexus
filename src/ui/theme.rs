@@ -1,16 +1,10 @@
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Color, Style};
 
 pub struct Theme;
 
 impl Theme {
     pub fn default() -> Style {
         Style::default().fg(Color::White)
-    }
-    
-    pub fn title() -> Style {
-        Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD)
     }
     
     pub fn selected() -> Style {
@@ -25,22 +19,6 @@ impl Theme {
     
     pub fn unfocused_border() -> Style {
         Style::default().fg(Color::DarkGray)
-    }
-    
-    pub fn error() -> Style {
-        Style::default().fg(Color::Red)
-    }
-    
-    pub fn success() -> Style {
-        Style::default().fg(Color::Green)
-    }
-    
-    pub fn warning() -> Style {
-        Style::default().fg(Color::Yellow)
-    }
-    
-    pub fn info() -> Style {
-        Style::default().fg(Color::Blue)
     }
     
     pub fn method_get() -> Style {

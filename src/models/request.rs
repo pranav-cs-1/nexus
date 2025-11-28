@@ -26,18 +26,6 @@ impl HttpMethod {
         }
     }
     
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s.to_uppercase().as_str() {
-            "GET" => Some(HttpMethod::GET),
-            "POST" => Some(HttpMethod::POST),
-            "PUT" => Some(HttpMethod::PUT),
-            "PATCH" => Some(HttpMethod::PATCH),
-            "DELETE" => Some(HttpMethod::DELETE),
-            "HEAD" => Some(HttpMethod::HEAD),
-            "OPTIONS" => Some(HttpMethod::OPTIONS),
-            _ => None,
-        }
-    }
     
     pub fn all() -> Vec<HttpMethod> {
         vec![

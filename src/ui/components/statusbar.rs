@@ -1,8 +1,6 @@
 use crate::app::state::AppState;
-use crate::ui::theme::Theme;
 use ratatui::{
     layout::Rect,
-    text::{Line, Span},
     widgets::{Block, Paragraph, Widget},
     style::{Style, Color},
 };

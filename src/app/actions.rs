@@ -13,16 +13,12 @@ pub enum Action {
     NextCollection,
     PrevCollection,
     NextEditorTab,
-    SendRequest,
     NewRequest,
     DeleteRequest,
     DuplicateRequest,
     NewCollection,
     DeleteCollection,
     EditCollection,
-    SaveRequest,
-    ToggleEnvironmentSelector,
-    ExportAsCurl,
 }
 
 impl Action {
@@ -92,10 +88,6 @@ impl Action {
             Action::EditCollection => {
                 state.start_editing_collection();
             }
-            Action::ToggleEnvironmentSelector => {
-                state.show_environment_selector = !state.show_environment_selector;
-            }
-            _ => {}
         }
     }
 }
