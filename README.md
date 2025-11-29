@@ -29,6 +29,13 @@ nexus
 
 On first launch, you'll be greeted with a welcome screen that provides an overview and quick start guide. Press any key to dismiss it and start using Nexus. Check out the **Example Collection** to see sample requests demonstrating the various features.
 
+### Exporting
+
+Nexus supports exporting your collections and requests:
+
+- **Collection Export**: Press `o` to open the export menu. Use arrow keys to select a collection, then press Enter to export it as JSON. The file will be saved in the `exports/` directory with a timestamp.
+- **curl Export**: Press `s` to open the curl export menu. Use arrow keys to select a collection, press Enter, then select a specific request. The curl command is saved as a shell script in the `exports/` directory and also copied to your clipboard.
+
 ### Keyboard Shortcuts
 
 **Navigation:**
@@ -45,8 +52,8 @@ On first launch, you'll be greeted with a welcome screen that provides an overvi
 - `y` - Duplicate current request
 - `c` - Create new collection (in Collections panel)
 - `x` - Delete collection (in Collections panel)
-- `o` - Export collection as JSON (in Collections panel)
-- `s` - Export request as curl command (in Requests/Editor panel)
+- `o` - Open collection export menu
+- `s` - Open curl export menu
 
 **Editing (when in edit mode):**
 - Arrow keys - Navigate text fields
