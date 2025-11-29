@@ -1,7 +1,9 @@
-use crate::app::state::AppState;
+use crate::app::state::{AppState, ExportMode, ExportMenuStage};
 use crate::models::collection::Collection;
 use crate::models::request::HttpRequest;
 use uuid::Uuid;
+use std::fs;
+use std::path::PathBuf;
 
 pub enum Action {
     Quit,
@@ -20,6 +22,8 @@ pub enum Action {
     DeleteCollection,
     EditCollection,
     CopyResponse,
+    OpenExportMenu,
+    OpenCurlExportMenu,
     ExportCollectionJson,
     ExportRequestCurl,
 }
@@ -99,8 +103,24 @@ impl Action {
                     }
                 }
             }
+            Action::OpenExportMenu => {
+                state.show_export_menu = true;
+                state.export_mode = Some(ExportMode::CollectionJson);
+                state.export_menu_stage = ExportMenuStage::SelectingCollection;
+                state.export_selected_collection = if !state.collections.is_empty() { Some(0) } else { None };
+                state.export_selected_request = None;
+                state.export_result_message = None;
+            }
+            Action::OpenCurlExportMenu => {
+                state.show_export_menu = true;
+                state.export_mode = Some(ExportMode::RequestCurl);
+                state.export_menu_stage = ExportMenuStage::SelectingCollection;
+                state.export_selected_collection = if !state.collections.is_empty() { Some(0) } else { None };
+                state.export_selected_request = None;
+                state.export_result_message = None;
+            }
             Action::ExportCollectionJson => {
-                if let Some(collection_idx) = state.selected_collection {
+                if let Some(collection_idx) = state.export_selected_collection {
                     if let Some(collection) = state.collections.get(collection_idx) {
                         // Get all requests for this collection
                         let collection_requests: Vec<_> = state.requests
@@ -110,18 +130,65 @@ impl Action {
                             .collect();
                         
                         if let Ok(json) = collection.to_json(&collection_requests) {
-                            if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                                let _ = clipboard.set_text(json);
+                            // Create exports directory if it doesn't exist
+                            let exports_dir = PathBuf::from("exports");
+                            let _ = fs::create_dir_all(&exports_dir);
+                            
+                            // Generate filename based on collection name
+                            let safe_name = collection.name
+                                .chars()
+                                .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+                                .collect::<String>();
+                            let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+                            let filename = format!("{}_{}.json", safe_name, timestamp);
+                            let filepath = exports_dir.join(&filename);
+                            
+                            match fs::write(&filepath, json) {
+                                Ok(_) => {
+                                    state.export_result_message = Some(filepath.to_string_lossy().to_string());
+                                    state.export_menu_stage = ExportMenuStage::ShowingResult;
+                                }
+                                Err(_) => {
+                                    state.export_result_message = Some("Failed to save export".to_string());
+                                    state.export_menu_stage = ExportMenuStage::ShowingResult;
+                                }
                             }
                         }
                     }
                 }
             }
             Action::ExportRequestCurl => {
-                if let Some(request) = state.get_current_request() {
-                    let curl = request.to_curl();
-                    if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                        let _ = clipboard.set_text(curl);
+                if let Some(request_idx) = state.export_selected_request {
+                    if let Some(request) = state.requests.get(request_idx) {
+                        let curl = request.to_curl();
+                        
+                        // Create exports directory if it doesn't exist
+                        let exports_dir = PathBuf::from("exports");
+                        let _ = fs::create_dir_all(&exports_dir);
+                        
+                        // Generate filename based on request name
+                        let safe_name = request.name
+                            .chars()
+                            .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+                            .collect::<String>();
+                        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+                        let filename = format!("{}_{}.sh", safe_name, timestamp);
+                        let filepath = exports_dir.join(&filename);
+                        
+                        match fs::write(&filepath, format!("#!/bin/bash\n\n{}\n", curl)) {
+                            Ok(_) => {
+                                state.export_result_message = Some(filepath.to_string_lossy().to_string());
+                                state.export_menu_stage = ExportMenuStage::ShowingResult;
+                                // Also copy to clipboard for convenience
+                                if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                                    let _ = clipboard.set_text(curl);
+                                }
+                            }
+                            Err(_) => {
+                                state.export_result_message = Some("Failed to save export".to_string());
+                                state.export_menu_stage = ExportMenuStage::ShowingResult;
+                            }
+                        }
                     }
                 }
             }

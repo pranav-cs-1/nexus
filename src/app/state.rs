@@ -5,6 +5,19 @@ use crate::models::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ExportMode {
+    CollectionJson,
+    RequestCurl,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ExportMenuStage {
+    SelectingCollection,
+    SelectingRequest,
+    ShowingResult,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Panel {
     Collections,
     Requests,
@@ -57,6 +70,12 @@ pub struct AppState {
     pub editor_tab: EditorTab,
     pub show_help: bool,
     pub show_welcome: bool,
+    pub show_export_menu: bool,
+    pub export_mode: Option<ExportMode>,
+    pub export_menu_stage: ExportMenuStage,
+    pub export_selected_collection: Option<usize>,
+    pub export_selected_request: Option<usize>,
+    pub export_result_message: Option<String>,
     pub input_mode: InputMode,
     
     pub is_loading: bool,
@@ -105,6 +124,12 @@ impl AppState {
             editor_tab: EditorTab::Params,
             show_help: false,
             show_welcome: true,
+            show_export_menu: false,
+            export_mode: None,
+            export_menu_stage: ExportMenuStage::SelectingCollection,
+            export_selected_collection: None,
+            export_selected_request: None,
+            export_result_message: None,
             input_mode: InputMode::Normal,
             
             is_loading: false,
