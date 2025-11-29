@@ -20,6 +20,8 @@ pub enum Action {
     DeleteCollection,
     EditCollection,
     CopyResponse,
+    ExportCollectionJson,
+    ExportRequestCurl,
 }
 
 impl Action {
@@ -94,6 +96,32 @@ impl Action {
                     let text_to_copy = response.formatted_body();
                     if let Ok(mut clipboard) = arboard::Clipboard::new() {
                         let _ = clipboard.set_text(text_to_copy);
+                    }
+                }
+            }
+            Action::ExportCollectionJson => {
+                if let Some(collection_idx) = state.selected_collection {
+                    if let Some(collection) = state.collections.get(collection_idx) {
+                        // Get all requests for this collection
+                        let collection_requests: Vec<_> = state.requests
+                            .iter()
+                            .filter(|r| r.collection_id == Some(collection.id))
+                            .cloned()
+                            .collect();
+                        
+                        if let Ok(json) = collection.to_json(&collection_requests) {
+                            if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                                let _ = clipboard.set_text(json);
+                            }
+                        }
+                    }
+                }
+            }
+            Action::ExportRequestCurl => {
+                if let Some(request) = state.get_current_request() {
+                    let curl = request.to_curl();
+                    if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                        let _ = clipboard.set_text(curl);
                     }
                 }
             }
