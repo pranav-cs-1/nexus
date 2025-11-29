@@ -174,8 +174,11 @@ async fn main() -> anyhow::Result<()> {
         if poll(std::time::Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
             if state.show_help {
-                if let KeyCode::Char('?') = key.code {
-                    Action::ToggleHelp.execute(&mut state);
+                match key.code {
+                    KeyCode::Char('?') | KeyCode::Esc => {
+                        Action::ToggleHelp.execute(&mut state);
+                    }
+                    _ => {}
                 }
                 continue;
             }
@@ -391,36 +394,40 @@ fn handle_edit_mode(state: &mut AppState, key: KeyEvent, storage: &storage::Stor
 }
 
 fn handle_name_edit(state: &mut AppState, key: KeyEvent) {
-    match key.code {
-        KeyCode::Char(c) => {
+    match (key.code, key.modifiers) {
+        (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+            state.name_input.clear();
+            state.name_cursor = 0;
+        }
+        (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
             state.name_input.insert(state.name_cursor, c);
             state.name_cursor += 1;
         }
-        KeyCode::Backspace => {
+        (KeyCode::Backspace, _) => {
             if state.name_cursor > 0 {
                 state.name_cursor -= 1;
                 state.name_input.remove(state.name_cursor);
             }
         }
-        KeyCode::Delete => {
+        (KeyCode::Delete, _) => {
             if state.name_cursor < state.name_input.len() {
                 state.name_input.remove(state.name_cursor);
             }
         }
-        KeyCode::Left => {
+        (KeyCode::Left, _) => {
             if state.name_cursor > 0 {
                 state.name_cursor -= 1;
             }
         }
-        KeyCode::Right => {
+        (KeyCode::Right, _) => {
             if state.name_cursor < state.name_input.len() {
                 state.name_cursor += 1;
             }
         }
-        KeyCode::Home => {
+        (KeyCode::Home, _) => {
             state.name_cursor = 0;
         }
-        KeyCode::End => {
+        (KeyCode::End, _) => {
             state.name_cursor = state.name_input.len();
         }
         _ => {}
@@ -445,36 +452,40 @@ fn handle_method_edit(state: &mut AppState, key: KeyEvent) {
 }
 
 fn handle_url_edit(state: &mut AppState, key: KeyEvent) {
-    match key.code {
-        KeyCode::Char(c) => {
+    match (key.code, key.modifiers) {
+        (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+            state.url_input.clear();
+            state.url_cursor = 0;
+        }
+        (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
             state.url_input.insert(state.url_cursor, c);
             state.url_cursor += 1;
         }
-        KeyCode::Backspace => {
+        (KeyCode::Backspace, _) => {
             if state.url_cursor > 0 {
                 state.url_cursor -= 1;
                 state.url_input.remove(state.url_cursor);
             }
         }
-        KeyCode::Delete => {
+        (KeyCode::Delete, _) => {
             if state.url_cursor < state.url_input.len() {
                 state.url_input.remove(state.url_cursor);
             }
         }
-        KeyCode::Left => {
+        (KeyCode::Left, _) => {
             if state.url_cursor > 0 {
                 state.url_cursor -= 1;
             }
         }
-        KeyCode::Right => {
+        (KeyCode::Right, _) => {
             if state.url_cursor < state.url_input.len() {
                 state.url_cursor += 1;
             }
         }
-        KeyCode::Home => {
+        (KeyCode::Home, _) => {
             state.url_cursor = 0;
         }
-        KeyCode::End => {
+        (KeyCode::End, _) => {
             state.url_cursor = state.url_input.len();
         }
         _ => {}
@@ -514,19 +525,24 @@ fn handle_params_edit(state: &mut AppState, key: KeyEvent) {
             }
         }
         KeyValueEditMode::Key => {
-            match key.code {
-                KeyCode::Esc => {
+            match (key.code, key.modifiers) {
+                (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+                    if let Some((key, _)) = state.params_input.get_mut(state.params_selected) {
+                        key.clear();
+                    }
+                }
+                (KeyCode::Esc, _) => {
                     state.kv_edit_mode = KeyValueEditMode::None;
                 }
-                KeyCode::Tab => {
+                (KeyCode::Tab, _) => {
                     state.kv_edit_mode = KeyValueEditMode::Value;
                 }
-                KeyCode::Char(c) => {
+                (KeyCode::Char(c), _) => {
                     if let Some((key, _)) = state.params_input.get_mut(state.params_selected) {
                         key.push(c);
                     }
                 }
-                KeyCode::Backspace => {
+                (KeyCode::Backspace, _) => {
                     if let Some((key, _)) = state.params_input.get_mut(state.params_selected) {
                         key.pop();
                     }
@@ -535,19 +551,24 @@ fn handle_params_edit(state: &mut AppState, key: KeyEvent) {
             }
         }
         KeyValueEditMode::Value => {
-            match key.code {
-                KeyCode::Esc => {
+            match (key.code, key.modifiers) {
+                (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+                    if let Some((_, value)) = state.params_input.get_mut(state.params_selected) {
+                        value.clear();
+                    }
+                }
+                (KeyCode::Esc, _) => {
                     state.kv_edit_mode = KeyValueEditMode::None;
                 }
-                KeyCode::Tab => {
+                (KeyCode::Tab, _) => {
                     state.kv_edit_mode = KeyValueEditMode::Key;
                 }
-                KeyCode::Char(c) => {
+                (KeyCode::Char(c), _) => {
                     if let Some((_, value)) = state.params_input.get_mut(state.params_selected) {
                         value.push(c);
                     }
                 }
-                KeyCode::Backspace => {
+                (KeyCode::Backspace, _) => {
                     if let Some((_, value)) = state.params_input.get_mut(state.params_selected) {
                         value.pop();
                     }
@@ -591,19 +612,24 @@ fn handle_headers_edit(state: &mut AppState, key: KeyEvent) {
             }
         }
         KeyValueEditMode::Key => {
-            match key.code {
-                KeyCode::Esc => {
+            match (key.code, key.modifiers) {
+                (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+                    if let Some((key, _)) = state.headers_input.get_mut(state.headers_selected) {
+                        key.clear();
+                    }
+                }
+                (KeyCode::Esc, _) => {
                     state.kv_edit_mode = KeyValueEditMode::None;
                 }
-                KeyCode::Tab => {
+                (KeyCode::Tab, _) => {
                     state.kv_edit_mode = KeyValueEditMode::Value;
                 }
-                KeyCode::Char(c) => {
+                (KeyCode::Char(c), _) => {
                     if let Some((key, _)) = state.headers_input.get_mut(state.headers_selected) {
                         key.push(c);
                     }
                 }
-                KeyCode::Backspace => {
+                (KeyCode::Backspace, _) => {
                     if let Some((key, _)) = state.headers_input.get_mut(state.headers_selected) {
                         key.pop();
                     }
@@ -612,19 +638,24 @@ fn handle_headers_edit(state: &mut AppState, key: KeyEvent) {
             }
         }
         KeyValueEditMode::Value => {
-            match key.code {
-                KeyCode::Esc => {
+            match (key.code, key.modifiers) {
+                (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+                    if let Some((_, value)) = state.headers_input.get_mut(state.headers_selected) {
+                        value.clear();
+                    }
+                }
+                (KeyCode::Esc, _) => {
                     state.kv_edit_mode = KeyValueEditMode::None;
                 }
-                KeyCode::Tab => {
+                (KeyCode::Tab, _) => {
                     state.kv_edit_mode = KeyValueEditMode::Key;
                 }
-                KeyCode::Char(c) => {
+                (KeyCode::Char(c), _) => {
                     if let Some((_, value)) = state.headers_input.get_mut(state.headers_selected) {
                         value.push(c);
                     }
                 }
-                KeyCode::Backspace => {
+                (KeyCode::Backspace, _) => {
                     if let Some((_, value)) = state.headers_input.get_mut(state.headers_selected) {
                         value.pop();
                     }
@@ -636,39 +667,49 @@ fn handle_headers_edit(state: &mut AppState, key: KeyEvent) {
 }
 
 fn handle_body_edit(state: &mut AppState, key: KeyEvent) {
-    match key.code {
-        KeyCode::Char(c) => {
+    match (key.code, key.modifiers) {
+        (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+            state.body_input.clear();
+            state.body_cursor = 0;
+        }
+        (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
             state.body_input.insert(state.body_cursor, c);
             state.body_cursor += 1;
         }
-        KeyCode::Backspace => {
+        (KeyCode::Backspace, _) => {
             if state.body_cursor > 0 {
                 state.body_cursor -= 1;
                 state.body_input.remove(state.body_cursor);
             }
         }
-        KeyCode::Delete => {
+        (KeyCode::Delete, _) => {
             if state.body_cursor < state.body_input.len() {
                 state.body_input.remove(state.body_cursor);
             }
         }
-        KeyCode::Left => {
+        (KeyCode::Left, _) => {
             if state.body_cursor > 0 {
                 state.body_cursor -= 1;
             }
         }
-        KeyCode::Right => {
+        (KeyCode::Right, _) => {
             if state.body_cursor < state.body_input.len() {
                 state.body_cursor += 1;
             }
         }
-        KeyCode::Home => {
-            state.body_cursor = 0;
+        (KeyCode::Up, _) => {
+            state.body_cursor = move_cursor_up(&state.body_input, state.body_cursor);
         }
-        KeyCode::End => {
-            state.body_cursor = state.body_input.len();
+        (KeyCode::Down, _) => {
+            state.body_cursor = move_cursor_down(&state.body_input, state.body_cursor);
         }
-        KeyCode::Enter => {
+        (KeyCode::Home, _) => {
+            state.body_cursor = move_cursor_to_line_start(&state.body_input, state.body_cursor);
+        }
+        (KeyCode::End, _) => {
+            state.body_cursor = move_cursor_to_line_end(&state.body_input, state.body_cursor);
+        }
+        (KeyCode::Enter, _) => {
             state.body_input.insert(state.body_cursor, '\n');
             state.body_cursor += 1;
         }
@@ -677,48 +718,66 @@ fn handle_body_edit(state: &mut AppState, key: KeyEvent) {
 }
 
 fn handle_auth_edit(state: &mut AppState, key: KeyEvent) {
-    match key.code {
-        KeyCode::Char(c) => {
+    match (key.code, key.modifiers) {
+        (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+            state.auth_input.clear();
+            state.auth_cursor = 0;
+        }
+        (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
             state.auth_input.insert(state.auth_cursor, c);
             state.auth_cursor += 1;
         }
-        KeyCode::Backspace => {
+        (KeyCode::Backspace, _) => {
             if state.auth_cursor > 0 {
                 state.auth_cursor -= 1;
                 state.auth_input.remove(state.auth_cursor);
             }
         }
-        KeyCode::Delete => {
+        (KeyCode::Delete, _) => {
             if state.auth_cursor < state.auth_input.len() {
                 state.auth_input.remove(state.auth_cursor);
             }
         }
-        KeyCode::Left => {
+        (KeyCode::Left, _) => {
             if state.auth_cursor > 0 {
                 state.auth_cursor -= 1;
             }
         }
-        KeyCode::Right => {
+        (KeyCode::Right, _) => {
             if state.auth_cursor < state.auth_input.len() {
                 state.auth_cursor += 1;
             }
         }
-        KeyCode::Home => {
-            state.auth_cursor = 0;
+        (KeyCode::Up, _) => {
+            state.auth_cursor = move_cursor_up(&state.auth_input, state.auth_cursor);
         }
-        KeyCode::End => {
-            state.auth_cursor = state.auth_input.len();
+        (KeyCode::Down, _) => {
+            state.auth_cursor = move_cursor_down(&state.auth_input, state.auth_cursor);
+        }
+        (KeyCode::Home, _) => {
+            state.auth_cursor = move_cursor_to_line_start(&state.auth_input, state.auth_cursor);
+        }
+        (KeyCode::End, _) => {
+            state.auth_cursor = move_cursor_to_line_end(&state.auth_input, state.auth_cursor);
+        }
+        (KeyCode::Enter, _) => {
+            state.auth_input.insert(state.auth_cursor, '\n');
+            state.auth_cursor += 1;
         }
         _ => {}
     }
 }
 
 fn handle_collection_edit_mode(state: &mut AppState, key: KeyEvent, storage: &storage::Storage) {
-    match key.code {
-        KeyCode::Esc => {
+    match (key.code, key.modifiers) {
+        (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+            state.collection_name_input.clear();
+            state.collection_name_cursor = 0;
+        }
+        (KeyCode::Esc, _) => {
             state.cancel_collection_editing();
         }
-        KeyCode::Enter => {
+        (KeyCode::Enter, _) => {
             state.save_collection_name();
             if let Some(idx) = state.selected_collection {
                 if let Some(collection) = state.collections.get(idx) {
@@ -726,39 +785,132 @@ fn handle_collection_edit_mode(state: &mut AppState, key: KeyEvent, storage: &st
                 }
             }
         }
-        KeyCode::Char(c) => {
+        (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
             state.collection_name_input.insert(state.collection_name_cursor, c);
             state.collection_name_cursor += 1;
         }
-        KeyCode::Backspace => {
+        (KeyCode::Backspace, _) => {
             if state.collection_name_cursor > 0 {
                 state.collection_name_cursor -= 1;
                 state.collection_name_input.remove(state.collection_name_cursor);
             }
         }
-        KeyCode::Delete => {
+        (KeyCode::Delete, _) => {
             if state.collection_name_cursor < state.collection_name_input.len() {
                 state.collection_name_input.remove(state.collection_name_cursor);
             }
         }
-        KeyCode::Left => {
+        (KeyCode::Left, _) => {
             if state.collection_name_cursor > 0 {
                 state.collection_name_cursor -= 1;
             }
         }
-        KeyCode::Right => {
+        (KeyCode::Right, _) => {
             if state.collection_name_cursor < state.collection_name_input.len() {
                 state.collection_name_cursor += 1;
             }
         }
-        KeyCode::Home => {
+        (KeyCode::Home, _) => {
             state.collection_name_cursor = 0;
         }
-        KeyCode::End => {
+        (KeyCode::End, _) => {
             state.collection_name_cursor = state.collection_name_input.len();
         }
         _ => {}
     }
+}
+
+// Helper functions for multiline text navigation
+
+/// Move cursor up one line, maintaining column position when possible
+fn move_cursor_up(text: &str, cursor_pos: usize) -> usize {
+    if cursor_pos == 0 {
+        return 0;
+    }
+    
+    // Find the start of the current line
+    let current_line_start = text[..cursor_pos]
+        .rfind('\n')
+        .map(|pos| pos + 1)
+        .unwrap_or(0);
+    
+    // If we're already on the first line, move to the start
+    if current_line_start == 0 {
+        return 0;
+    }
+    
+    // Calculate column position in current line
+    let column = cursor_pos - current_line_start;
+    
+    // Find the start of the previous line
+    let prev_line_start = text[..current_line_start - 1]
+        .rfind('\n')
+        .map(|pos| pos + 1)
+        .unwrap_or(0);
+    
+    // Find the end of the previous line (excluding the newline)
+    let prev_line_end = current_line_start - 1;
+    let prev_line_len = prev_line_end - prev_line_start;
+    
+    // Move to the same column or to the end of the previous line if it's shorter
+    prev_line_start + column.min(prev_line_len)
+}
+
+/// Move cursor down one line, maintaining column position when possible
+fn move_cursor_down(text: &str, cursor_pos: usize) -> usize {
+    if cursor_pos >= text.len() {
+        return text.len();
+    }
+    
+    // Find the start of the current line
+    let current_line_start = text[..cursor_pos]
+        .rfind('\n')
+        .map(|pos| pos + 1)
+        .unwrap_or(0);
+    
+    // Find the end of the current line
+    let current_line_end = text[cursor_pos..]
+        .find('\n')
+        .map(|pos| cursor_pos + pos)
+        .unwrap_or(text.len());
+    
+    // If we're on the last line, move to the end
+    if current_line_end >= text.len() {
+        return text.len();
+    }
+    
+    // Calculate column position in current line
+    let column = cursor_pos - current_line_start;
+    
+    // The next line starts after the newline
+    let next_line_start = current_line_end + 1;
+    
+    // Find the end of the next line
+    let next_line_end = text[next_line_start..]
+        .find('\n')
+        .map(|pos| next_line_start + pos)
+        .unwrap_or(text.len());
+    
+    let next_line_len = next_line_end - next_line_start;
+    
+    // Move to the same column or to the end of the next line if it's shorter
+    next_line_start + column.min(next_line_len)
+}
+
+/// Move cursor to the start of the current line
+fn move_cursor_to_line_start(text: &str, cursor_pos: usize) -> usize {
+    text[..cursor_pos]
+        .rfind('\n')
+        .map(|pos| pos + 1)
+        .unwrap_or(0)
+}
+
+/// Move cursor to the end of the current line
+fn move_cursor_to_line_end(text: &str, cursor_pos: usize) -> usize {
+    text[cursor_pos..]
+        .find('\n')
+        .map(|pos| cursor_pos + pos)
+        .unwrap_or(text.len())
 }
 
 

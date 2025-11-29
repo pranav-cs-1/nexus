@@ -105,9 +105,31 @@ impl<'a> RequestEditor<'a> {
             let display_text = &self.state.name_input;
             if is_focused {
                 let cursor_pos = self.state.name_cursor;
-                let before = display_text.chars().take(cursor_pos).collect::<String>();
-                let cursor_char = display_text.chars().nth(cursor_pos).unwrap_or(' ');
-                let after = display_text.chars().skip(cursor_pos + 1).collect::<String>();
+                
+                // Calculate available width for text (subtract 2 for borders)
+                let available_width = area.width.saturating_sub(2) as usize;
+                
+                // Calculate scroll offset to keep cursor visible
+                let scroll_offset = if cursor_pos >= available_width {
+                    // Keep cursor near the right edge with some margin
+                    cursor_pos.saturating_sub(available_width.saturating_sub(1))
+                } else {
+                    0
+                };
+                
+                // Get the visible portion of the text
+                let visible_text: String = display_text
+                    .chars()
+                    .skip(scroll_offset)
+                    .take(available_width)
+                    .collect();
+                
+                // Adjust cursor position relative to visible text
+                let visible_cursor_pos = cursor_pos.saturating_sub(scroll_offset);
+                
+                let before = visible_text.chars().take(visible_cursor_pos).collect::<String>();
+                let cursor_char = visible_text.chars().nth(visible_cursor_pos).unwrap_or(' ');
+                let after = visible_text.chars().skip(visible_cursor_pos + 1).collect::<String>();
                 
                 Line::from(vec![
                     Span::raw(before),
@@ -159,9 +181,31 @@ impl<'a> RequestEditor<'a> {
             let display_text = &self.state.url_input;
             if is_focused {
                 let cursor_pos = self.state.url_cursor;
-                let before = display_text.chars().take(cursor_pos).collect::<String>();
-                let cursor_char = display_text.chars().nth(cursor_pos).unwrap_or(' ');
-                let after = display_text.chars().skip(cursor_pos + 1).collect::<String>();
+                
+                // Calculate available width for text (subtract 2 for borders)
+                let available_width = area.width.saturating_sub(2) as usize;
+                
+                // Calculate scroll offset to keep cursor visible
+                let scroll_offset = if cursor_pos >= available_width {
+                    // Keep cursor near the right edge with some margin
+                    cursor_pos.saturating_sub(available_width.saturating_sub(1))
+                } else {
+                    0
+                };
+                
+                // Get the visible portion of the text
+                let visible_text: String = display_text
+                    .chars()
+                    .skip(scroll_offset)
+                    .take(available_width)
+                    .collect();
+                
+                // Adjust cursor position relative to visible text
+                let visible_cursor_pos = cursor_pos.saturating_sub(scroll_offset);
+                
+                let before = visible_text.chars().take(visible_cursor_pos).collect::<String>();
+                let cursor_char = visible_text.chars().nth(visible_cursor_pos).unwrap_or(' ');
+                let after = visible_text.chars().skip(visible_cursor_pos + 1).collect::<String>();
                 
                 Line::from(vec![
                     Span::raw(before),
@@ -350,24 +394,10 @@ impl<'a> RequestEditor<'a> {
             .borders(Borders::ALL)
             .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
         
-        let text = if is_editing {
-            let display_text = &self.state.auth_input;
-            if is_focused {
-                let cursor_pos = self.state.auth_cursor;
-                let before = display_text.chars().take(cursor_pos).collect::<String>();
-                let cursor_char = display_text.chars().nth(cursor_pos).unwrap_or(' ');
-                let after = display_text.chars().skip(cursor_pos + 1).collect::<String>();
-                
-                Line::from(vec![
-                    Span::raw(before),
-                    Span::styled(cursor_char.to_string(), Theme::selected()),
-                    Span::raw(after),
-                ])
-            } else {
-                Line::from(display_text.as_str())
-            }
+        let mut display_text = if is_editing {
+            self.state.auth_input.clone()
         } else {
-            let auth_text = match &request.auth {
+            match &request.auth {
                 crate::models::request::AuthType::None => "No authentication".to_string(),
                 crate::models::request::AuthType::Bearer { token } => {
                     format!("Bearer: {}", token)
@@ -378,11 +408,18 @@ impl<'a> RequestEditor<'a> {
                 crate::models::request::AuthType::ApiKey { key, value, location } => {
                     format!("API Key: {} = {} ({:?})", key, value, location)
                 }
-            };
-            Line::from(auth_text)
+            }
         };
         
-        Paragraph::new(text).block(block).render(area, buf);
+        if is_editing && is_focused {
+            let cursor_pos = self.state.auth_cursor.min(display_text.len());
+            display_text.insert(cursor_pos, '▌');
+        }
+        
+        Paragraph::new(display_text)
+            .wrap(Wrap { trim: false })
+            .block(block)
+            .render(area, buf);
     }
 }
 
