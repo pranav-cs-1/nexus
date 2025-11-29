@@ -179,6 +179,11 @@ async fn main() -> anyhow::Result<()> {
                 continue;
             }
             
+            if state.show_export_menu {
+                handle_export_menu(&mut state, key);
+                continue;
+            }
+            
             if state.show_help {
                 match key.code {
                     KeyCode::Char('?') | KeyCode::Esc => {
@@ -312,13 +317,11 @@ async fn main() -> anyhow::Result<()> {
                 }
                 (KeyCode::Char('o'), KeyModifiers::NONE) => {
                     if state.focused_panel == Panel::Collections {
-                        Action::ExportCollectionJson.execute(&mut state);
+                        Action::OpenExportMenu.execute(&mut state);
                     }
                 }
                 (KeyCode::Char('s'), KeyModifiers::NONE) => {
-                    if state.focused_panel == Panel::Requests || state.focused_panel == Panel::RequestEditor {
-                        Action::ExportRequestCurl.execute(&mut state);
-                    }
+                    Action::OpenCurlExportMenu.execute(&mut state);
                 }
                 _ => {}
             }
@@ -781,6 +784,124 @@ fn handle_auth_edit(state: &mut AppState, key: KeyEvent) {
             state.auth_cursor += 1;
         }
         _ => {}
+    }
+}
+
+fn handle_export_menu(state: &mut AppState, key: KeyEvent) {
+    use app::state::{ExportMode, ExportMenuStage};
+    
+    match state.export_menu_stage {
+        ExportMenuStage::ShowingResult => {
+            // Any key closes the menu after showing result
+            state.show_export_menu = false;
+            state.export_result_message = None;
+            state.export_selected_collection = None;
+            state.export_selected_request = None;
+            state.export_mode = None;
+        }
+        ExportMenuStage::SelectingCollection => {
+            match key.code {
+                KeyCode::Esc => {
+                    state.show_export_menu = false;
+                    state.export_selected_collection = None;
+                    state.export_mode = None;
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    if let Some(idx) = state.export_selected_collection {
+                        if idx > 0 {
+                            state.export_selected_collection = Some(idx - 1);
+                        }
+                    }
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    if let Some(idx) = state.export_selected_collection {
+                        if idx < state.collections.len().saturating_sub(1) {
+                            state.export_selected_collection = Some(idx + 1);
+                        }
+                    }
+                }
+                KeyCode::Enter => {
+                    match state.export_mode {
+                        Some(ExportMode::CollectionJson) => {
+                            Action::ExportCollectionJson.execute(state);
+                        }
+                        Some(ExportMode::RequestCurl) => {
+                            // Move to request selection stage
+                            if let Some(collection_idx) = state.export_selected_collection {
+                                if let Some(collection) = state.collections.get(collection_idx) {
+                                    // Find first request in this collection
+                                    let first_request_idx = state.requests
+                                        .iter()
+                                        .enumerate()
+                                        .find(|(_, r)| r.collection_id == Some(collection.id))
+                                        .map(|(idx, _)| idx);
+                                    
+                                    state.export_selected_request = first_request_idx;
+                                    state.export_menu_stage = ExportMenuStage::SelectingRequest;
+                                }
+                            }
+                        }
+                        None => {}
+                    }
+                }
+                _ => {}
+            }
+        }
+        ExportMenuStage::SelectingRequest => {
+            match key.code {
+                KeyCode::Esc => {
+                    // Go back to collection selection
+                    state.export_menu_stage = ExportMenuStage::SelectingCollection;
+                    state.export_selected_request = None;
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    if let Some(current_idx) = state.export_selected_request {
+                        if let Some(collection_idx) = state.export_selected_collection {
+                            if let Some(collection) = state.collections.get(collection_idx) {
+                                // Find previous request in this collection
+                                let requests_in_collection: Vec<usize> = state.requests
+                                    .iter()
+                                    .enumerate()
+                                    .filter(|(_, r)| r.collection_id == Some(collection.id))
+                                    .map(|(idx, _)| idx)
+                                    .collect();
+                                
+                                if let Some(pos) = requests_in_collection.iter().position(|&idx| idx == current_idx) {
+                                    if pos > 0 {
+                                        state.export_selected_request = Some(requests_in_collection[pos - 1]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    if let Some(current_idx) = state.export_selected_request {
+                        if let Some(collection_idx) = state.export_selected_collection {
+                            if let Some(collection) = state.collections.get(collection_idx) {
+                                // Find next request in this collection
+                                let requests_in_collection: Vec<usize> = state.requests
+                                    .iter()
+                                    .enumerate()
+                                    .filter(|(_, r)| r.collection_id == Some(collection.id))
+                                    .map(|(idx, _)| idx)
+                                    .collect();
+                                
+                                if let Some(pos) = requests_in_collection.iter().position(|&idx| idx == current_idx) {
+                                    if pos < requests_in_collection.len() - 1 {
+                                        state.export_selected_request = Some(requests_in_collection[pos + 1]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                KeyCode::Enter => {
+                    Action::ExportRequestCurl.execute(state);
+                }
+                _ => {}
+            }
+        }
     }
 }
 
