@@ -40,6 +40,8 @@ impl Widget for HelpPopup {
             "    y                 - Duplicate request",
             "    c                 - New collection (in collections)",
             "    x                 - Delete collection (in collections)",
+            "    o                 - Export collection as JSON (in collections)",
+            "    s                 - Export request as curl (in requests/editor)",
             "",
             "  Editing (when in edit mode):",
             "    Name/URL/Body/Auth: Type to edit, arrows to move cursor",
