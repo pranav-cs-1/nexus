@@ -4,4 +4,5 @@ pub mod request_editor;
 pub mod response_viewer;
 pub mod statusbar;
 pub mod help_popup;
+pub mod welcome_popup;
 
