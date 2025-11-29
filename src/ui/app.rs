@@ -8,6 +8,7 @@ use crate::ui::{
         statusbar::StatusBar,
         help_popup::HelpPopup,
         welcome_popup::WelcomePopup,
+        export_popup::ExportPopup,
     },
     layout::Layout,
 };
@@ -27,6 +28,8 @@ impl UI {
         
         if state.show_welcome {
             Self::draw_welcome(frame, state);
+        } else if state.show_export_menu {
+            Self::draw_export_menu(frame, state);
         } else if state.show_help {
             Self::draw_help(frame, state);
         }
@@ -66,6 +69,12 @@ impl UI {
     fn draw_welcome(frame: &mut Frame, _state: &AppState) {
         let component = WelcomePopup::new();
         let area = Self::centered_rect(frame.area(), 70, 90);
+        frame.render_widget(component, area);
+    }
+    
+    fn draw_export_menu(frame: &mut Frame, state: &AppState) {
+        let component = ExportPopup::new(state);
+        let area = Self::centered_rect(frame.area(), 60, 50);
         frame.render_widget(component, area);
     }
     
