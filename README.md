@@ -13,6 +13,7 @@ Nexus provides a keyboard-driven interface to help you manage and execute API ca
 - **Persistent Storage** - All data automatically saved using sled embedded database
 - **Keyboard-Driven** - Vim-like navigation and shortcuts for maximum efficiency
 - **Built-in Examples** - Sample requests included to help you get started quickly
+- **Export Support** - Export collections as JSON or individual requests as curl commands
 
 ## Installation
 
@@ -44,6 +45,8 @@ On first launch, you'll be greeted with a welcome screen that provides an overvi
 - `y` - Duplicate current request
 - `c` - Create new collection (in Collections panel)
 - `x` - Delete collection (in Collections panel)
+- `o` - Export collection as JSON (in Collections panel)
+- `s` - Export request as curl command (in Requests/Editor panel)
 
 **Editing (when in edit mode):**
 - Arrow keys - Navigate text fields

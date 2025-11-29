@@ -310,6 +310,16 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
                 }
+                (KeyCode::Char('o'), KeyModifiers::NONE) => {
+                    if state.focused_panel == Panel::Collections {
+                        Action::ExportCollectionJson.execute(&mut state);
+                    }
+                }
+                (KeyCode::Char('s'), KeyModifiers::NONE) => {
+                    if state.focused_panel == Panel::Requests || state.focused_panel == Panel::RequestEditor {
+                        Action::ExportRequestCurl.execute(&mut state);
+                    }
+                }
                 _ => {}
             }
             }

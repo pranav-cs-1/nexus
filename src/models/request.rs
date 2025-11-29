@@ -124,6 +124,45 @@ impl HttpRequest {
             format!("{}?{}", self.url, params.join("&"))
         }
     }
+    
+    // Generate curl command equivalent for this request
+    pub fn to_curl(&self) -> String {
+        let mut curl = format!("curl -X {} '{}'", self.method.as_str(), self.full_url());
+        
+        // Add headers
+        for (key, value) in &self.headers {
+            curl.push_str(&format!(" \\\n  -H '{}: {}'", key, value));
+        }
+        
+        // Add auth header if present
+        match &self.auth {
+            AuthType::Bearer { token } => {
+                curl.push_str(&format!(" \\\n  -H 'Authorization: Bearer {}'", token));
+            }
+            AuthType::Basic { username, password } => {
+                curl.push_str(&format!(" \\\n  -u '{}:{}'", username, password));
+            }
+            AuthType::ApiKey { key, value, location } => {
+                match location {
+                    ApiKeyLocation::Header => {
+                        curl.push_str(&format!(" \\\n  -H '{}: {}'", key, value));
+                    }
+                    ApiKeyLocation::QueryParam => {
+                        // Already included in full_url()
+                    }
+                }
+            }
+            AuthType::None => {}
+        }
+        
+        // Add body if present
+        if let Some(body) = &self.body {
+            let escaped_body = body.replace('\'', "'\\''");
+            curl.push_str(&format!(" \\\n  -d '{}'", escaped_body));
+        }
+        
+        curl
+    }
 }
 
 impl Default for HttpRequest {
