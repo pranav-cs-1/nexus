@@ -56,6 +56,7 @@ pub struct AppState {
     pub focused_panel: Panel,
     pub editor_tab: EditorTab,
     pub show_help: bool,
+    pub show_welcome: bool,
     pub input_mode: InputMode,
     
     pub is_loading: bool,
@@ -103,6 +104,7 @@ impl AppState {
             focused_panel: Panel::Collections,
             editor_tab: EditorTab::Params,
             show_help: false,
+            show_welcome: true,
             input_mode: InputMode::Normal,
             
             is_loading: false,

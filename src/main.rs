@@ -42,7 +42,7 @@ async fn main() -> anyhow::Result<()> {
     
     // If no data exists, create sample data
     if state.collections.is_empty() {
-        let default_collection = models::collection::Collection::new("Collection 1".to_string());
+        let default_collection = models::collection::Collection::new("Example Collection".to_string());
         let collection_id = default_collection.id;
         storage.save_collection(&default_collection)?;
         state.collections.push(default_collection);
@@ -173,6 +173,12 @@ async fn main() -> anyhow::Result<()> {
         
         if poll(std::time::Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
+            if state.show_welcome {
+                // Any key dismisses the welcome screen
+                state.show_welcome = false;
+                continue;
+            }
+            
             if state.show_help {
                 match key.code {
                     KeyCode::Char('?') | KeyCode::Esc => {

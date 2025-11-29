@@ -7,6 +7,7 @@ use crate::ui::{
         response_viewer::ResponseViewer,
         statusbar::StatusBar,
         help_popup::HelpPopup,
+        welcome_popup::WelcomePopup,
     },
     layout::Layout,
 };
@@ -24,7 +25,9 @@ impl UI {
         Self::draw_response(frame, layout.response, state);
         Self::draw_statusbar(frame, layout.statusbar, state);
         
-        if state.show_help {
+        if state.show_welcome {
+            Self::draw_welcome(frame, state);
+        } else if state.show_help {
             Self::draw_help(frame, state);
         }
     }
@@ -57,6 +60,12 @@ impl UI {
     fn draw_help(frame: &mut Frame, _state: &AppState) {
         let component = HelpPopup::new();
         let area = Self::centered_rect(frame.area(), 60, 80);
+        frame.render_widget(component, area);
+    }
+    
+    fn draw_welcome(frame: &mut Frame, _state: &AppState) {
+        let component = WelcomePopup::new();
+        let area = Self::centered_rect(frame.area(), 70, 90);
         frame.render_widget(component, area);
     }
     
