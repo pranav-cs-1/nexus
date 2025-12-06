@@ -29,7 +29,7 @@ impl<'a> Widget for RequestEditor<'a> {
         };
         
         let title = if is_editing {
-            "Request Editor [EDITING - ESC to save, Tab to switch fields]"
+            "Request Editor [EDITING - ESC to save, Tab/Shift+Tab to switch fields]"
         } else {
             "Request Editor [Press 'e' to edit]"
         };
