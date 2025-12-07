@@ -316,9 +316,7 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
                 (KeyCode::Char('o'), KeyModifiers::NONE) => {
-                    if state.focused_panel == Panel::Collections {
-                        Action::OpenExportMenu.execute(&mut state);
-                    }
+                    Action::OpenExportMenu.execute(&mut state);
                 }
                 (KeyCode::Char('s'), KeyModifiers::NONE) => {
                     Action::OpenCurlExportMenu.execute(&mut state);
