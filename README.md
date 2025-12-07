@@ -6,7 +6,9 @@ Nexus provides a keyboard-driven interface to help you manage and execute API ca
 
 ## Demo
 
-![Nexus Demo](assets/demo.gif)
+<div align="center">
+  <video src="assets/nexus_demo.mov" width="100%" controls></video>
+</div>
 
 ## Features
 
