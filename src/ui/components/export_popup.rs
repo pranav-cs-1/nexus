@@ -49,7 +49,7 @@ impl<'a> ExportPopup<'a> {
                 Line::from(""),
                 Line::from(format!("Saved to: {}", export_result)),
                 Line::from(""),
-                Line::from("Press any key to continue..."),
+                Line::from("Press 'c' to copy filename, any other key to continue..."),
                 Line::from(""),
             ];
             

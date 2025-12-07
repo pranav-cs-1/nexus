@@ -824,6 +824,21 @@ fn handle_export_menu(state: &mut AppState, key: KeyEvent) {
     
     match state.export_menu_stage {
         ExportMenuStage::ShowingResult => {
+            // Check if user wants to copy the filename
+            if key.code == KeyCode::Char('c') || key.code == KeyCode::Char('y') {
+                // Copy the exported filename to clipboard
+                if let Some(filepath) = &state.export_result_message {
+                    if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                        // Extract just the filename from the full path
+                        let filename = std::path::Path::new(filepath)
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or(filepath);
+                        let _ = clipboard.set_text(filename.to_string());
+                    }
+                }
+            }
+            
             // Any key closes the menu after showing result
             state.show_export_menu = false;
             state.export_result_message = None;
