@@ -4,6 +4,10 @@ A terminal-based HTTP client for API testing built in Rust.
 
 Nexus provides a keyboard-driven interface to help you manage and execute API calls efficiently. All your collections, requests, and configurations are automatically persisted using [sled](https://github.com/spacejam/sled), an embedded database, so your work is saved between sessions.
 
+## Demo
+
+![Nexus Demo](assets/demo.gif)
+
 ## Features
 
 - **Full HTTP Method Support** - GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS
