@@ -1,9 +1,9 @@
 [package]
 name = "nexus-tui"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["pranav-cs-1"]
-description = "Professional API testing TUI"
+description = "A terminal-based HTTP client for API testing"
 license = "MIT"
 repository = "https://github.com/pranav-cs-1/nexus"
 readme = "README-crates.md"
