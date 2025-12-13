@@ -1,11 +1,12 @@
 [package]
 name = "nexus-tui"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["pranav-cs-1"]
 description = "Professional API testing TUI"
 license = "MIT"
 repository = "https://github.com/pranav-cs-1/nexus"
+readme = "README-crates.md"
 keywords = ["api", "http", "tui", "rest", "testing"]
 categories = ["command-line-utilities", "development-tools"]
 exclude = ["assets/", "convert_to_gif.py"]
