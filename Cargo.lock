@@ -1104,7 +1104,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "nexus"
+name = "nexus-tui"
 version = "0.1.0"
 dependencies = [
  "anyhow",
