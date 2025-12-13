@@ -8,6 +8,7 @@ license = "MIT"
 repository = "https://github.com/pranav-cs-1/nexus"
 keywords = ["api", "http", "tui", "rest", "testing"]
 categories = ["command-line-utilities", "development-tools"]
+exclude = ["assets/*.gif", "convert_to_gif.py"]
 
 [[bin]]
 name = "nexus"
