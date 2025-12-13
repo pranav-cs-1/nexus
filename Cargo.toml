@@ -1,5 +1,5 @@
 [package]
-name = "nexus"
+name = "nexus-tui"
 version = "0.1.0"
 edition = "2021"
 authors = ["pranav-cs-1"]
@@ -8,6 +8,10 @@ license = "MIT"
 repository = "https://github.com/pranav-cs-1/nexus"
 keywords = ["api", "http", "tui", "rest", "testing"]
 categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "nexus"
+path = "src/main.rs"
 
 [dependencies]
 ratatui = "0.28"

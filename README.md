@@ -23,6 +23,14 @@ Nexus provides a keyboard-driven interface to help you manage and execute API ca
 
 ## Installation
 
+### From crates.io
+
+```bash
+cargo install nexus-tui
+```
+
+### From source
+
 ```bash
 cargo install --path .
 ```
