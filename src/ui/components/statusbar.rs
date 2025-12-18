@@ -38,7 +38,7 @@ impl<'a> Widget for StatusBar<'a> {
         let full_text = if self.state.is_loading {
             format!(" Loading... | {}", self.state.loading_message)
         } else {
-            " q: quit | ?: help | Tab: next panel | Enter: send | n: new | o: export menu | s: export curl".to_string()
+            " q: quit | ?: help | Tab: next panel | Enter: send | n: new | i: import | o: export menu | s: export curl".to_string()
         };
 
         let status_text = Self::truncate_text(&full_text, area.width as usize);

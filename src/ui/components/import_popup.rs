@@ -38,6 +38,11 @@ impl<'a> ImportPopup<'a> {
         let cursor_pos = self.state.import_file_cursor;
         let input_value = &self.state.import_file_input;
 
+        // Get current directory
+        let current_dir = std::env::current_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| "unknown".to_string());
+
         // Create cursor indicator
         let display_text = if input_value.is_empty() {
             "│".to_string()
@@ -49,15 +54,18 @@ impl<'a> ImportPopup<'a> {
 
         let lines = vec![
             Line::from(""),
+            Line::from(format!("Current directory: {}", current_dir)),
+            Line::from(""),
             Line::from("Enter the path to your Postman collection JSON file:"),
             Line::from(""),
             Line::from(display_text),
             Line::from(""),
             Line::from("Examples:"),
-            Line::from("  /path/to/collection.json"),
+            Line::from("  ./test_postman_collection.json (relative)"),
+            Line::from("  /absolute/path/to/collection.json"),
             Line::from("  ~/Downloads/postman_collection.json"),
             Line::from(""),
-            Line::from("Press Enter to import, Esc to cancel"),
+            Line::from("Press Tab for autocomplete, Enter to import, Esc to cancel"),
             Line::from(""),
         ];
 
