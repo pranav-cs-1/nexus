@@ -1,5 +1,6 @@
 mod app;
 mod http;
+mod import;
 mod models;
 mod storage;
 mod ui;
@@ -183,7 +184,12 @@ async fn main() -> anyhow::Result<()> {
                 handle_export_menu(&mut state, key);
                 continue;
             }
-            
+
+            if state.show_import_menu {
+                handle_import_menu(&mut state, key);
+                continue;
+            }
+
             if state.show_help {
                 match key.code {
                     KeyCode::Char('?') | KeyCode::Esc => {
@@ -320,6 +326,9 @@ async fn main() -> anyhow::Result<()> {
                 }
                 (KeyCode::Char('s'), KeyModifiers::NONE) => {
                     Action::OpenCurlExportMenu.execute(&mut state);
+                }
+                (KeyCode::Char('i'), KeyModifiers::NONE) => {
+                    Action::OpenImportMenu.execute(&mut state);
                 }
                 _ => {}
             }
@@ -949,6 +958,65 @@ fn handle_export_menu(state: &mut AppState, key: KeyEvent) {
                 _ => {}
             }
         }
+    }
+}
+
+fn handle_import_menu(state: &mut AppState, key: KeyEvent) {
+    // If showing result, any key closes the menu
+    if state.import_result_message.is_some() {
+        state.show_import_menu = false;
+        state.import_result_message = None;
+        state.import_file_input.clear();
+        state.import_file_cursor = 0;
+        return;
+    }
+
+    // Otherwise, handle file input
+    match (key.code, key.modifiers) {
+        (KeyCode::Esc, _) => {
+            state.show_import_menu = false;
+            state.import_file_input.clear();
+            state.import_file_cursor = 0;
+        }
+        (KeyCode::Enter, _) => {
+            Action::ImportPostmanCollection.execute(state);
+        }
+        (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+            state.import_file_input.clear();
+            state.import_file_cursor = 0;
+        }
+        (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
+            state.import_file_input.insert(state.import_file_cursor, c);
+            state.import_file_cursor += 1;
+        }
+        (KeyCode::Backspace, _) => {
+            if state.import_file_cursor > 0 {
+                state.import_file_cursor -= 1;
+                state.import_file_input.remove(state.import_file_cursor);
+            }
+        }
+        (KeyCode::Delete, _) => {
+            if state.import_file_cursor < state.import_file_input.len() {
+                state.import_file_input.remove(state.import_file_cursor);
+            }
+        }
+        (KeyCode::Left, _) => {
+            if state.import_file_cursor > 0 {
+                state.import_file_cursor -= 1;
+            }
+        }
+        (KeyCode::Right, _) => {
+            if state.import_file_cursor < state.import_file_input.len() {
+                state.import_file_cursor += 1;
+            }
+        }
+        (KeyCode::Home, _) => {
+            state.import_file_cursor = 0;
+        }
+        (KeyCode::End, _) => {
+            state.import_file_cursor = state.import_file_input.len();
+        }
+        _ => {}
     }
 }
 

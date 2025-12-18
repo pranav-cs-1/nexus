@@ -76,6 +76,10 @@ pub struct AppState {
     pub export_selected_collection: Option<usize>,
     pub export_selected_request: Option<usize>,
     pub export_result_message: Option<String>,
+    pub show_import_menu: bool,
+    pub import_file_input: String,
+    pub import_file_cursor: usize,
+    pub import_result_message: Option<String>,
     pub input_mode: InputMode,
     
     pub is_loading: bool,
@@ -130,6 +134,10 @@ impl AppState {
             export_selected_collection: None,
             export_selected_request: None,
             export_result_message: None,
+            show_import_menu: false,
+            import_file_input: String::new(),
+            import_file_cursor: 0,
+            import_result_message: None,
             input_mode: InputMode::Normal,
             
             is_loading: false,
