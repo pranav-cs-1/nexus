@@ -1083,54 +1083,52 @@ fn autocomplete_file_path(state: &mut AppState) {
 
         if matches.len() == 1 {
             // Single match - complete it
-            let completed = if search_dir == Path::new(".") {
-                matches[0].clone()
-            } else {
-                let mut full_path = search_dir.join(&matches[0]);
+            let mut full_path = search_dir.join(&matches[0]);
 
-                // Add trailing slash for directories
-                if full_path.is_dir() {
-                    full_path.push("");
+            // Add trailing slash for directories
+            if full_path.is_dir() {
+                full_path.push("");
+            }
+
+            // Convert back to string, preserve the original prefix
+            let mut full_str = full_path.to_string_lossy().to_string();
+
+            // Preserve ~ if it was used
+            if input.starts_with("~/") {
+                if let Some(home) = std::env::var("HOME").ok() {
+                    full_str = full_str.replace(&home, "~");
                 }
-
-                // Convert back to string, preserve ~ if it was used
-                let full_str = full_path.to_string_lossy().to_string();
-                if input.starts_with("~/") {
-                    if let Some(home) = std::env::var("HOME").ok() {
-                        full_str.replace(&home, "~")
-                    } else {
-                        full_str
-                    }
-                } else {
-                    full_str
+            }
+            // Preserve ./ if it was used and we're in current directory
+            else if input.starts_with("./") && search_dir == Path::new(".") {
+                if !full_str.starts_with("./") {
+                    full_str = format!("./{}", full_str);
                 }
-            };
+            }
 
-            state.import_file_input = completed;
+            state.import_file_input = full_str;
             state.import_file_cursor = state.import_file_input.len();
         } else {
             // Multiple matches - complete to common prefix
             let common_prefix = find_common_prefix(&matches);
             if common_prefix.len() > prefix.len() {
-                let completed = if search_dir == Path::new(".") {
-                    common_prefix
-                } else {
-                    let full_path = search_dir.join(&common_prefix);
-                    let full_str = full_path.to_string_lossy().to_string();
+                let full_path = search_dir.join(&common_prefix);
+                let mut full_str = full_path.to_string_lossy().to_string();
 
-                    // Preserve ~ if it was used
-                    if input.starts_with("~/") {
-                        if let Some(home) = std::env::var("HOME").ok() {
-                            full_str.replace(&home, "~")
-                        } else {
-                            full_str
-                        }
-                    } else {
-                        full_str
+                // Preserve ~ if it was used
+                if input.starts_with("~/") {
+                    if let Some(home) = std::env::var("HOME").ok() {
+                        full_str = full_str.replace(&home, "~");
                     }
-                };
+                }
+                // Preserve ./ if it was used and we're in current directory
+                else if input.starts_with("./") && search_dir == Path::new(".") {
+                    if !full_str.starts_with("./") {
+                        full_str = format!("./{}", full_str);
+                    }
+                }
 
-                state.import_file_input = completed;
+                state.import_file_input = full_str;
                 state.import_file_cursor = state.import_file_input.len();
             }
         }

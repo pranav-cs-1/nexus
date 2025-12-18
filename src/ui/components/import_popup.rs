@@ -56,11 +56,11 @@ impl<'a> ImportPopup<'a> {
             Line::from(""),
             Line::from(format!("Working directory: {}", current_dir)),
             Line::from(""),
-            Line::from("File path:"),
+            Line::from("File path: (use ~/ for home directory)"),
             Line::from(""),
             Line::from(display_text),
             Line::from(""),
-            Line::from("Tab: autocomplete | Enter: import | Esc: cancel"),
+            Line::from("Tab: autocomplete | Enter: import | Ctrl+U: clear | Esc: cancel"),
             Line::from(""),
         ];
 
