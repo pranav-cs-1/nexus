@@ -209,7 +209,18 @@ impl Action {
                     return;
                 }
 
-                let path = Path::new(file_path);
+                // Expand ~ to home directory
+                let expanded_path = if file_path.starts_with("~/") {
+                    if let Ok(home) = std::env::var("HOME") {
+                        file_path.replacen("~", &home, 1)
+                    } else {
+                        file_path.to_string()
+                    }
+                } else {
+                    file_path.to_string()
+                };
+
+                let path = Path::new(&expanded_path);
 
                 if !path.exists() {
                     state.import_result_message = Some(format!("Error: File not found: {}", file_path));
