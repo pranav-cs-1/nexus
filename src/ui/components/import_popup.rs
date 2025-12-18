@@ -54,18 +54,13 @@ impl<'a> ImportPopup<'a> {
 
         let lines = vec![
             Line::from(""),
-            Line::from(format!("Current directory: {}", current_dir)),
+            Line::from(format!("Working directory: {}", current_dir)),
             Line::from(""),
-            Line::from("Enter the path to your Postman collection JSON file:"),
+            Line::from("File path:"),
             Line::from(""),
             Line::from(display_text),
             Line::from(""),
-            Line::from("Examples:"),
-            Line::from("  ./test_postman_collection.json (relative)"),
-            Line::from("  /absolute/path/to/collection.json"),
-            Line::from("  ~/Downloads/postman_collection.json"),
-            Line::from(""),
-            Line::from("Press Tab for autocomplete, Enter to import, Esc to cancel"),
+            Line::from("Tab: autocomplete | Enter: import | Esc: cancel"),
             Line::from(""),
         ];
 

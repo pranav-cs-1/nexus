@@ -197,8 +197,8 @@ impl Action {
             }
             Action::OpenImportMenu => {
                 state.show_import_menu = true;
-                state.import_file_input.clear();
-                state.import_file_cursor = 0;
+                state.import_file_input = "./".to_string();
+                state.import_file_cursor = 2;
                 state.import_result_message = None;
             }
             Action::ImportPostmanCollection => {

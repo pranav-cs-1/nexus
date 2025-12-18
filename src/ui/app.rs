@@ -83,7 +83,7 @@ impl UI {
 
     fn draw_import_menu(frame: &mut Frame, state: &AppState) {
         let component = ImportPopup::new(state);
-        let area = Self::centered_rect(frame.area(), 70, 60);
+        let area = Self::centered_rect(frame.area(), 70, 40);
         frame.render_widget(component, area);
     }
 
