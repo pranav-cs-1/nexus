@@ -19,6 +19,7 @@ Nexus provides a keyboard-driven interface to help you manage and execute API ca
 - **Persistent Storage** - All data automatically saved using sled embedded database
 - **Keyboard-Driven** - Vim-like navigation and shortcuts for maximum efficiency
 - **Built-in Examples** - Sample requests included to help you get started quickly
+- **Import Collections** - Import Postman Collections (v2.1) with full support for authentication, headers, and nested folders
 - **Export Support** - Export collections as JSON or individual requests as curl commands
 
 ## Installation
@@ -43,7 +44,18 @@ nexus
 
 On first launch, you'll be greeted with a welcome screen that provides an overview and quick start guide. Press any key to dismiss it and start using Nexus. Check out the **Example Collection** to see sample requests demonstrating the various features.
 
-### Exporting
+### Importing Collections
+
+Nexus supports importing Postman Collections (v2.1 format):
+
+- **Import Collection**: Press `i` to open the import dialog. Enter the path to your Postman collection JSON file (supports Tab autocomplete). Press Enter to import. The collection and all its requests will be added to Nexus with support for:
+  - Nested folders (flattened with path prefixes)
+  - All HTTP methods
+  - Headers and query parameters
+  - Request bodies (raw, urlencoded, formdata)
+  - Authentication (Bearer, Basic, API Key)
+
+### Exporting Collections
 
 Nexus supports exporting your collections and requests:
 
@@ -66,6 +78,7 @@ Nexus supports exporting your collections and requests:
 - `y` - Duplicate current request
 - `c` - Create new collection (in Collections panel)
 - `x` - Delete collection (in Collections panel)
+- `i` - Import Postman collection
 - `o` - Open collection export menu
 - `s` - Open curl export menu
 
