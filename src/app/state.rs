@@ -76,6 +76,10 @@ pub struct AppState {
     pub export_selected_collection: Option<usize>,
     pub export_selected_request: Option<usize>,
     pub export_result_message: Option<String>,
+    pub show_import_menu: bool,
+    pub import_file_input: String,
+    pub import_file_cursor: usize,
+    pub import_result_message: Option<String>,
     pub input_mode: InputMode,
     
     pub is_loading: bool,
@@ -130,6 +134,10 @@ impl AppState {
             export_selected_collection: None,
             export_selected_request: None,
             export_result_message: None,
+            show_import_menu: false,
+            import_file_input: String::new(),
+            import_file_cursor: 0,
+            import_result_message: None,
             input_mode: InputMode::Normal,
             
             is_loading: false,
@@ -295,22 +303,50 @@ impl AppState {
     }
     
     pub fn next_request(&mut self) {
-        if let Some(idx) = self.selected_request {
-            if idx < self.requests.len().saturating_sub(1) {
-                self.selected_request = Some(idx + 1);
-                self.clear_input_buffers();
+        // Get the collection_id to filter by
+        let collection_id = self.selected_collection
+            .and_then(|idx| self.collections.get(idx))
+            .map(|c| c.id);
+
+        if let Some(current_idx) = self.selected_request {
+            // Find the next request that belongs to the same collection
+            for idx in (current_idx + 1)..self.requests.len() {
+                let request_collection_id = self.requests.get(idx).and_then(|r| r.collection_id);
+                if collection_id == request_collection_id {
+                    self.selected_request = Some(idx);
+                    self.clear_input_buffers();
+                    return;
+                }
             }
         } else if !self.requests.is_empty() {
-            self.selected_request = Some(0);
-            self.clear_input_buffers();
+            // Find the first request that belongs to the selected collection
+            for (idx, request) in self.requests.iter().enumerate() {
+                if collection_id == request.collection_id {
+                    self.selected_request = Some(idx);
+                    self.clear_input_buffers();
+                    return;
+                }
+            }
         }
     }
-    
+
     pub fn prev_request(&mut self) {
-        if let Some(idx) = self.selected_request {
-            if idx > 0 {
-                self.selected_request = Some(idx - 1);
-                self.clear_input_buffers();
+        // Get the collection_id to filter by
+        let collection_id = self.selected_collection
+            .and_then(|idx| self.collections.get(idx))
+            .map(|c| c.id);
+
+        if let Some(current_idx) = self.selected_request {
+            // Find the previous request that belongs to the same collection
+            if current_idx > 0 {
+                for idx in (0..current_idx).rev() {
+                    let request_collection_id = self.requests.get(idx).and_then(|r| r.collection_id);
+                    if collection_id == request_collection_id {
+                        self.selected_request = Some(idx);
+                        self.clear_input_buffers();
+                        return;
+                    }
+                }
             }
         }
     }

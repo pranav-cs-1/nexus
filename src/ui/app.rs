@@ -9,6 +9,7 @@ use crate::ui::{
         help_popup::HelpPopup,
         welcome_popup::WelcomePopup,
         export_popup::ExportPopup,
+        import_popup::ImportPopup,
     },
     layout::Layout,
 };
@@ -30,6 +31,8 @@ impl UI {
             Self::draw_welcome(frame, state);
         } else if state.show_export_menu {
             Self::draw_export_menu(frame, state);
+        } else if state.show_import_menu {
+            Self::draw_import_menu(frame, state);
         } else if state.show_help {
             Self::draw_help(frame, state);
         }
@@ -77,7 +80,13 @@ impl UI {
         let area = Self::centered_rect(frame.area(), 60, 50);
         frame.render_widget(component, area);
     }
-    
+
+    fn draw_import_menu(frame: &mut Frame, state: &AppState) {
+        let component = ImportPopup::new(state);
+        let area = Self::centered_rect(frame.area(), 70, 40);
+        frame.render_widget(component, area);
+    }
+
     fn centered_rect(r: Rect, percent_x: u16, percent_y: u16) -> Rect {
         let popup_layout = RatatuiLayout::default()
             .direction(Direction::Vertical)

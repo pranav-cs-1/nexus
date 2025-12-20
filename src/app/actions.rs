@@ -1,9 +1,10 @@
 use crate::app::state::{AppState, ExportMode, ExportMenuStage};
+use crate::import::import_postman_collection;
 use crate::models::collection::Collection;
 use crate::models::request::HttpRequest;
 use uuid::Uuid;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub enum Action {
     Quit,
@@ -26,6 +27,8 @@ pub enum Action {
     OpenCurlExportMenu,
     ExportCollectionJson,
     ExportRequestCurl,
+    OpenImportMenu,
+    ImportPostmanCollection,
 }
 
 impl Action {
@@ -161,11 +164,11 @@ impl Action {
                 if let Some(request_idx) = state.export_selected_request {
                     if let Some(request) = state.requests.get(request_idx) {
                         let curl = request.to_curl();
-                        
+
                         // Create exports directory if it doesn't exist
                         let exports_dir = PathBuf::from("exports");
                         let _ = fs::create_dir_all(&exports_dir);
-                        
+
                         // Generate filename based on request name
                         let safe_name = request.name
                             .chars()
@@ -174,7 +177,7 @@ impl Action {
                         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
                         let filename = format!("{}_{}.sh", safe_name, timestamp);
                         let filepath = exports_dir.join(&filename);
-                        
+
                         match fs::write(&filepath, format!("#!/bin/bash\n\n{}\n", curl)) {
                             Ok(_) => {
                                 state.export_result_message = Some(filepath.to_string_lossy().to_string());
@@ -189,6 +192,67 @@ impl Action {
                                 state.export_menu_stage = ExportMenuStage::ShowingResult;
                             }
                         }
+                    }
+                }
+            }
+            Action::OpenImportMenu => {
+                state.show_import_menu = true;
+                state.import_file_input = "./".to_string();
+                state.import_file_cursor = 2;
+                state.import_result_message = None;
+            }
+            Action::ImportPostmanCollection => {
+                let file_path = state.import_file_input.trim();
+
+                if file_path.is_empty() {
+                    state.import_result_message = Some("Error: Please enter a file path".to_string());
+                    return;
+                }
+
+                // Expand ~ to home directory
+                let expanded_path = if file_path.starts_with("~/") {
+                    if let Ok(home) = std::env::var("HOME") {
+                        file_path.replacen("~", &home, 1)
+                    } else {
+                        file_path.to_string()
+                    }
+                } else {
+                    file_path.to_string()
+                };
+
+                let path = Path::new(&expanded_path);
+
+                if !path.exists() {
+                    state.import_result_message = Some(format!("Error: File not found: {}", file_path));
+                    return;
+                }
+
+                match import_postman_collection(path) {
+                    Ok((collection, requests)) => {
+                        let num_requests = requests.len();
+
+                        // Add the collection
+                        state.collections.push(collection.clone());
+                        state.selected_collection = Some(state.collections.len() - 1);
+
+                        // Add all the requests
+                        for request in requests {
+                            state.requests.push(request);
+                        }
+
+                        // Select the first imported request
+                        if num_requests > 0 {
+                            state.selected_request = Some(state.requests.len() - num_requests);
+                        }
+
+                        state.import_result_message = Some(format!(
+                            "Successfully imported collection '{}' with {} request(s)",
+                            collection.name,
+                            num_requests
+                        ));
+                    }
+                    Err(e) => {
+                        state.import_result_message = Some(format!("Error: {}", e));
                     }
                 }
             }

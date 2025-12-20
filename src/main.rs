@@ -1,5 +1,6 @@
 mod app;
 mod http;
+mod import;
 mod models;
 mod storage;
 mod ui;
@@ -183,7 +184,12 @@ async fn main() -> anyhow::Result<()> {
                 handle_export_menu(&mut state, key);
                 continue;
             }
-            
+
+            if state.show_import_menu {
+                handle_import_menu(&mut state, key);
+                continue;
+            }
+
             if state.show_help {
                 match key.code {
                     KeyCode::Char('?') | KeyCode::Esc => {
@@ -320,6 +326,9 @@ async fn main() -> anyhow::Result<()> {
                 }
                 (KeyCode::Char('s'), KeyModifiers::NONE) => {
                     Action::OpenCurlExportMenu.execute(&mut state);
+                }
+                (KeyCode::Char('i'), KeyModifiers::NONE) => {
+                    Action::OpenImportMenu.execute(&mut state);
                 }
                 _ => {}
             }
@@ -950,6 +959,203 @@ fn handle_export_menu(state: &mut AppState, key: KeyEvent) {
             }
         }
     }
+}
+
+fn handle_import_menu(state: &mut AppState, key: KeyEvent) {
+    // If showing result, any key closes the menu
+    if state.import_result_message.is_some() {
+        state.show_import_menu = false;
+        state.import_result_message = None;
+        state.import_file_input.clear();
+        state.import_file_cursor = 0;
+        return;
+    }
+
+    // Otherwise, handle file input
+    match (key.code, key.modifiers) {
+        (KeyCode::Esc, _) => {
+            state.show_import_menu = false;
+            state.import_file_input.clear();
+            state.import_file_cursor = 0;
+        }
+        (KeyCode::Enter, _) => {
+            Action::ImportPostmanCollection.execute(state);
+        }
+        (KeyCode::Tab, _) => {
+            // Tab autocomplete for file paths
+            autocomplete_file_path(state);
+        }
+        (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+            state.import_file_input.clear();
+            state.import_file_cursor = 0;
+        }
+        (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
+            state.import_file_input.insert(state.import_file_cursor, c);
+            state.import_file_cursor += 1;
+        }
+        (KeyCode::Backspace, _) => {
+            if state.import_file_cursor > 0 {
+                state.import_file_cursor -= 1;
+                state.import_file_input.remove(state.import_file_cursor);
+            }
+        }
+        (KeyCode::Delete, _) => {
+            if state.import_file_cursor < state.import_file_input.len() {
+                state.import_file_input.remove(state.import_file_cursor);
+            }
+        }
+        (KeyCode::Left, _) => {
+            if state.import_file_cursor > 0 {
+                state.import_file_cursor -= 1;
+            }
+        }
+        (KeyCode::Right, _) => {
+            if state.import_file_cursor < state.import_file_input.len() {
+                state.import_file_cursor += 1;
+            }
+        }
+        (KeyCode::Home, _) => {
+            state.import_file_cursor = 0;
+        }
+        (KeyCode::End, _) => {
+            state.import_file_cursor = state.import_file_input.len();
+        }
+        _ => {}
+    }
+}
+
+fn autocomplete_file_path(state: &mut AppState) {
+    use std::path::{Path, PathBuf};
+
+    let input = state.import_file_input.trim();
+    if input.is_empty() {
+        return;
+    }
+
+    // Expand ~ to home directory
+    let expanded = if input.starts_with("~/") {
+        if let Some(home) = std::env::var("HOME").ok() {
+            input.replacen("~", &home, 1)
+        } else {
+            input.to_string()
+        }
+    } else {
+        input.to_string()
+    };
+
+    let path = Path::new(&expanded);
+
+    // Determine the directory to search and the prefix to match
+    let (search_dir, prefix) = if expanded.ends_with('/') || expanded.ends_with('\\') {
+        // User typed a trailing slash, search in that directory
+        (path.to_path_buf(), String::new())
+    } else if let Some(parent) = path.parent() {
+        // Search in parent directory for files matching the filename
+        let file_name = path.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+        (parent.to_path_buf(), file_name)
+    } else {
+        // No parent, search in current directory
+        (PathBuf::from("."), expanded.clone())
+    };
+
+    // Read directory and find matches
+    if let Ok(entries) = std::fs::read_dir(&search_dir) {
+        let mut matches: Vec<String> = entries
+            .filter_map(|entry| entry.ok())
+            .filter_map(|entry| {
+                let file_name = entry.file_name().to_string_lossy().to_string();
+                if file_name.starts_with(&prefix) && !file_name.starts_with('.') {
+                    Some(file_name)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        matches.sort();
+
+        if matches.is_empty() {
+            return;
+        }
+
+        if matches.len() == 1 {
+            // Single match - complete it
+            let mut full_path = search_dir.join(&matches[0]);
+
+            // Add trailing slash for directories
+            if full_path.is_dir() {
+                full_path.push("");
+            }
+
+            // Convert back to string, preserve the original prefix
+            let mut full_str = full_path.to_string_lossy().to_string();
+
+            // Preserve ~ if it was used
+            if input.starts_with("~/") {
+                if let Some(home) = std::env::var("HOME").ok() {
+                    full_str = full_str.replace(&home, "~");
+                }
+            }
+            // Preserve ./ if it was used and we're in current directory
+            else if input.starts_with("./") && search_dir == Path::new(".") {
+                if !full_str.starts_with("./") {
+                    full_str = format!("./{}", full_str);
+                }
+            }
+
+            state.import_file_input = full_str;
+            state.import_file_cursor = state.import_file_input.len();
+        } else {
+            // Multiple matches - complete to common prefix
+            let common_prefix = find_common_prefix(&matches);
+            if common_prefix.len() > prefix.len() {
+                let full_path = search_dir.join(&common_prefix);
+                let mut full_str = full_path.to_string_lossy().to_string();
+
+                // Preserve ~ if it was used
+                if input.starts_with("~/") {
+                    if let Some(home) = std::env::var("HOME").ok() {
+                        full_str = full_str.replace(&home, "~");
+                    }
+                }
+                // Preserve ./ if it was used and we're in current directory
+                else if input.starts_with("./") && search_dir == Path::new(".") {
+                    if !full_str.starts_with("./") {
+                        full_str = format!("./{}", full_str);
+                    }
+                }
+
+                state.import_file_input = full_str;
+                state.import_file_cursor = state.import_file_input.len();
+            }
+        }
+    }
+}
+
+fn find_common_prefix(strings: &[String]) -> String {
+    if strings.is_empty() {
+        return String::new();
+    }
+
+    if strings.len() == 1 {
+        return strings[0].clone();
+    }
+
+    let mut prefix = String::new();
+    let first = &strings[0];
+
+    for (i, ch) in first.chars().enumerate() {
+        if strings.iter().all(|s| s.chars().nth(i) == Some(ch)) {
+            prefix.push(ch);
+        } else {
+            break;
+        }
+    }
+
+    prefix
 }
 
 fn handle_collection_edit_mode(state: &mut AppState, key: KeyEvent, storage: &storage::Storage) {
