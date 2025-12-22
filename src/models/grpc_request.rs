@@ -53,6 +53,7 @@ pub enum ProtoSource {
     },
 }
 
+#[allow(dead_code)]
 impl GrpcRequest {
     pub fn new(name: String, server_url: String) -> Self {
         let now = Utc::now();

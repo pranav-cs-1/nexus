@@ -3,6 +3,7 @@ use super::{request::HttpRequest, response::HttpResponse, GrpcRequest, GrpcRespo
 
 /// Unified request type supporting multiple protocols
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub enum RequestType {
     Http(HttpRequest),
     Grpc(GrpcRequest),
@@ -10,11 +11,13 @@ pub enum RequestType {
 
 /// Unified response type supporting multiple protocols
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub enum ResponseType {
     Http(HttpResponse),
     Grpc(GrpcResponse),
 }
 
+#[allow(dead_code)]
 impl RequestType {
     pub fn name(&self) -> &str {
         match self {
@@ -46,6 +49,7 @@ impl RequestType {
     }
 }
 
+#[allow(dead_code)]
 impl ResponseType {
     pub fn is_http(&self) -> bool {
         matches!(self, ResponseType::Http(_))

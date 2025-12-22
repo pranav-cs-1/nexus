@@ -1,13 +1,15 @@
-use crate::models::{GrpcRequest, GrpcResponse, GrpcMessage, GrpcStatus};
+use crate::models::{GrpcRequest, GrpcResponse, GrpcStatus};
 use anyhow::Result;
 use std::time::Instant;
 use tonic::transport::Channel;
 use uuid::Uuid;
 
+#[allow(dead_code)]
 pub struct GrpcClient {
     // Will be populated with dynamic client in future iterations
 }
 
+#[allow(dead_code)]
 impl GrpcClient {
     pub fn new() -> Self {
         Self {}

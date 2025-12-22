@@ -24,6 +24,7 @@ enum HttpResult {
     Error(String),
 }
 
+#[allow(dead_code)]
 enum GrpcResult {
     Success(models::GrpcResponse),
     Error(String),

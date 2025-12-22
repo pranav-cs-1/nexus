@@ -29,6 +29,7 @@ pub struct GrpcStatus {
     pub message: String,
 }
 
+#[allow(dead_code)]
 impl GrpcResponse {
     pub fn new(request_id: Uuid) -> Self {
         Self {

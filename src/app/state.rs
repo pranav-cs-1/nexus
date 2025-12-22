@@ -61,6 +61,7 @@ pub enum KeyValueEditMode {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(dead_code)]
 pub enum ProtocolType {
     Http,
     Grpc,
@@ -121,8 +122,10 @@ pub struct AppState {
     pub response_scroll: u16,
 
     // gRPC support
+    #[allow(dead_code)]
     pub protocol_type: ProtocolType,
     pub grpc_requests: Vec<GrpcRequest>,
+    #[allow(dead_code)]
     pub grpc_response: Option<GrpcResponse>,
     pub proto_schemas: Vec<ProtoSchema>,
 
@@ -503,14 +506,17 @@ impl AppState {
 
     // gRPC request helpers
 
+    #[allow(dead_code)]
     pub fn get_current_grpc_request(&self) -> Option<&GrpcRequest> {
         self.selected_request.and_then(|idx| self.grpc_requests.get(idx))
     }
 
+    #[allow(dead_code)]
     pub fn get_current_grpc_request_mut(&mut self) -> Option<&mut GrpcRequest> {
         self.selected_request.and_then(|idx| self.grpc_requests.get_mut(idx))
     }
 
+    #[allow(dead_code)]
     pub fn get_all_requests_count(&self) -> usize {
         match self.protocol_type {
             ProtocolType::Http => self.requests.len(),

@@ -43,6 +43,7 @@ pub struct MethodInfo {
     pub output_type: String,
 }
 
+#[allow(dead_code)]
 impl ProtoSchema {
     pub fn new(name: String, file_descriptor_set: Vec<u8>, source_type: ProtoSourceType) -> Self {
         let now = Utc::now();

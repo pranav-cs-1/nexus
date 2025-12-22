@@ -158,6 +158,7 @@ impl Storage {
 
     // gRPC request storage methods
 
+    #[allow(dead_code)]
     pub fn save_grpc_request(&self, request: &GrpcRequest) -> Result<()> {
         let tree = self.db.open_tree(GRPC_REQUESTS_TREE)
             .context("Failed to open gRPC requests tree")?;
@@ -193,6 +194,7 @@ impl Storage {
         Ok(requests)
     }
 
+    #[allow(dead_code)]
     pub fn delete_grpc_request(&self, id: &uuid::Uuid) -> Result<()> {
         let tree = self.db.open_tree(GRPC_REQUESTS_TREE)
             .context("Failed to open gRPC requests tree")?;
@@ -206,6 +208,7 @@ impl Storage {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn delete_grpc_requests_by_collection(&self, collection_id: &uuid::Uuid) -> Result<()> {
         let tree = self.db.open_tree(GRPC_REQUESTS_TREE)
             .context("Failed to open gRPC requests tree")?;
@@ -235,6 +238,7 @@ impl Storage {
 
     // Proto schema storage methods
 
+    #[allow(dead_code)]
     pub fn save_proto_schema(&self, schema: &ProtoSchema) -> Result<()> {
         let tree = self.db.open_tree(PROTO_SCHEMAS_TREE)
             .context("Failed to open proto schemas tree")?;
@@ -270,6 +274,7 @@ impl Storage {
         Ok(schemas)
     }
 
+    #[allow(dead_code)]
     pub fn delete_proto_schema(&self, id: &uuid::Uuid) -> Result<()> {
         let tree = self.db.open_tree(PROTO_SCHEMAS_TREE)
             .context("Failed to open proto schemas tree")?;
