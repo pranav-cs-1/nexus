@@ -336,9 +336,19 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
                 (KeyCode::Char('n'), KeyModifiers::NONE) => {
-                    Action::NewRequest.execute(&mut state);
-                    if let Some(request) = state.requests.last() {
-                        let _ = storage.save_request(request);
+                    match state.protocol_type {
+                        ProtocolType::Http => {
+                            Action::NewRequest.execute(&mut state);
+                            if let Some(request) = state.requests.last() {
+                                let _ = storage.save_request(request);
+                            }
+                        }
+                        ProtocolType::Grpc => {
+                            Action::NewGrpcRequest.execute(&mut state);
+                            if let Some(request) = state.grpc_requests.last() {
+                                let _ = storage.save_grpc_request(request);
+                            }
+                        }
                     }
                 }
                 (KeyCode::Char('g'), KeyModifiers::NONE) => {
@@ -364,17 +374,68 @@ async fn main() -> anyhow::Result<()> {
                 }
                 (KeyCode::Char('d'), KeyModifiers::NONE) => {
                     if let Some(idx) = state.selected_request {
-                        if let Some(request) = state.requests.get(idx) {
-                            let request_id = request.id;
-                            Action::DeleteRequest.execute(&mut state);
-                            let _ = storage.delete_request(&request_id);
+                        match state.protocol_type {
+                            ProtocolType::Http => {
+                                if let Some(request) = state.requests.get(idx) {
+                                    let request_id = request.id;
+                                    state.requests.remove(idx);
+                                    if state.requests.is_empty() {
+                                        state.selected_request = None;
+                                    } else if idx >= state.requests.len() {
+                                        state.selected_request = Some(state.requests.len() - 1);
+                                    }
+                                    state.clear_input_buffers();
+                                    let _ = storage.delete_request(&request_id);
+                                }
+                            }
+                            ProtocolType::Grpc => {
+                                if let Some(request) = state.grpc_requests.get(idx) {
+                                    let request_id = request.id;
+                                    state.grpc_requests.remove(idx);
+                                    if state.grpc_requests.is_empty() {
+                                        state.selected_request = None;
+                                    } else if idx >= state.grpc_requests.len() {
+                                        state.selected_request = Some(state.grpc_requests.len() - 1);
+                                    }
+                                    state.clear_input_buffers();
+                                    let _ = storage.delete_grpc_request(&request_id);
+                                }
+                            }
                         }
                     }
                 }
                 (KeyCode::Char('y'), KeyModifiers::NONE) => {
-                    Action::DuplicateRequest.execute(&mut state);
-                    if let Some(request) = state.requests.last() {
-                        let _ = storage.save_request(request);
+                    match state.protocol_type {
+                        ProtocolType::Http => {
+                            if let Some(request) = state.get_current_request() {
+                                let mut new_request = request.clone();
+                                new_request.id = Uuid::new_v4();
+                                new_request.name = format!("{} (copy)", new_request.name);
+                                if let Some(collection_idx) = state.selected_collection {
+                                    if let Some(collection) = state.collections.get(collection_idx) {
+                                        new_request.collection_id = Some(collection.id);
+                                    }
+                                }
+                                state.requests.push(new_request.clone());
+                                state.selected_request = Some(state.requests.len() - 1);
+                                let _ = storage.save_request(&new_request);
+                            }
+                        }
+                        ProtocolType::Grpc => {
+                            if let Some(request) = state.get_current_grpc_request() {
+                                let mut new_request = request.clone();
+                                new_request.id = Uuid::new_v4();
+                                new_request.name = format!("{} (copy)", new_request.name);
+                                if let Some(collection_idx) = state.selected_collection {
+                                    if let Some(collection) = state.collections.get(collection_idx) {
+                                        new_request.collection_id = Some(collection.id);
+                                    }
+                                }
+                                state.grpc_requests.push(new_request.clone());
+                                state.selected_request = Some(state.grpc_requests.len() - 1);
+                                let _ = storage.save_grpc_request(&new_request);
+                            }
+                        }
                     }
                 }
                 (KeyCode::Char('e'), KeyModifiers::NONE) => {
