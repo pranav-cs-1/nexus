@@ -186,7 +186,7 @@ async fn main() -> anyhow::Result<()> {
             }
 
             if state.show_import_menu {
-                handle_import_menu(&mut state, key);
+                handle_import_menu(&mut state, key, &storage);
                 continue;
             }
 
@@ -961,7 +961,7 @@ fn handle_export_menu(state: &mut AppState, key: KeyEvent) {
     }
 }
 
-fn handle_import_menu(state: &mut AppState, key: KeyEvent) {
+fn handle_import_menu(state: &mut AppState, key: KeyEvent, storage: &storage::Storage) {
     // If showing result, any key closes the menu
     if state.import_result_message.is_some() {
         state.show_import_menu = false;
@@ -979,7 +979,27 @@ fn handle_import_menu(state: &mut AppState, key: KeyEvent) {
             state.import_file_cursor = 0;
         }
         (KeyCode::Enter, _) => {
+            // Store the counts before import to identify what was imported
+            let collections_before = state.collections.len();
+            let requests_before = state.requests.len();
+
             Action::ImportPostmanCollection.execute(state);
+
+            // If import was successful, save the new collection and requests to storage
+            if state.import_result_message.is_some() &&
+               !state.import_result_message.as_ref().unwrap().starts_with("Error") {
+                // Save the newly imported collection
+                if state.collections.len() > collections_before {
+                    if let Some(collection) = state.collections.last() {
+                        let _ = storage.save_collection(collection);
+                    }
+                }
+
+                // Save all newly imported requests
+                for request in state.requests.iter().skip(requests_before) {
+                    let _ = storage.save_request(request);
+                }
+            }
         }
         (KeyCode::Tab, _) => {
             // Tab autocomplete for file paths
