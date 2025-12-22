@@ -73,12 +73,14 @@ impl<'a> Widget for RequestList<'a> {
                 
                 let line = if is_selected {
                     Line::from(vec![
+                        Span::raw("[H] "),
                         Span::styled(method_str.clone(), Self::method_style(&request.method)),
                         Span::raw(" "),
                         Span::styled(request.name.clone(), Theme::selected()),
                     ])
                 } else {
                     Line::from(vec![
+                        Span::raw("[H] "),
                         Span::styled(method_str, Self::method_style(&request.method)),
                         Span::raw(" "),
                         Span::raw(request.name.clone()),

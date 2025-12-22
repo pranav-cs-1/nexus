@@ -24,6 +24,11 @@ enum HttpResult {
     Error(String),
 }
 
+enum GrpcResult {
+    Success(models::GrpcResponse),
+    Error(String),
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     utils::logger::init()?;
@@ -41,6 +46,8 @@ async fn main() -> anyhow::Result<()> {
     // Load collections and requests from storage
     state.collections = storage.load_collections()?;
     state.requests = storage.load_requests()?;
+    state.grpc_requests = storage.load_grpc_requests()?;
+    state.proto_schemas = storage.load_proto_schemas()?;
     
     // If no data exists, create sample data
     if state.collections.is_empty() {

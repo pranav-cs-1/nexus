@@ -500,6 +500,23 @@ impl AppState {
     pub fn reset_response_scroll(&mut self) {
         self.response_scroll = 0;
     }
+
+    // gRPC request helpers
+
+    pub fn get_current_grpc_request(&self) -> Option<&GrpcRequest> {
+        self.selected_request.and_then(|idx| self.grpc_requests.get(idx))
+    }
+
+    pub fn get_current_grpc_request_mut(&mut self) -> Option<&mut GrpcRequest> {
+        self.selected_request.and_then(|idx| self.grpc_requests.get_mut(idx))
+    }
+
+    pub fn get_all_requests_count(&self) -> usize {
+        match self.protocol_type {
+            ProtocolType::Http => self.requests.len(),
+            ProtocolType::Grpc => self.grpc_requests.len(),
+        }
+    }
 }
 
 impl Default for AppState {
