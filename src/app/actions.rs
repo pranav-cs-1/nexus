@@ -2,6 +2,7 @@ use crate::app::state::{AppState, ExportMode, ExportMenuStage};
 use crate::import::import_postman_collection;
 use crate::models::collection::Collection;
 use crate::models::request::HttpRequest;
+use crate::models::GrpcRequest;
 use uuid::Uuid;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -17,6 +18,7 @@ pub enum Action {
     PrevCollection,
     NextEditorTab,
     NewRequest,
+    NewGrpcRequest,
     DeleteRequest,
     DuplicateRequest,
     NewCollection,
@@ -52,6 +54,16 @@ impl Action {
                 }
                 state.requests.push(request);
                 state.selected_request = Some(state.requests.len() - 1);
+            }
+            Action::NewGrpcRequest => {
+                let mut request = GrpcRequest::new("New gRPC Request".to_string(), "localhost:50051".to_string());
+                if let Some(collection_idx) = state.selected_collection {
+                    if let Some(collection) = state.collections.get(collection_idx) {
+                        request.collection_id = Some(collection.id);
+                    }
+                }
+                state.grpc_requests.push(request);
+                state.selected_request = Some(state.grpc_requests.len() - 1);
             }
             Action::DeleteRequest => {
                 if let Some(idx) = state.selected_request {

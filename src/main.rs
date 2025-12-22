@@ -7,7 +7,7 @@ mod storage;
 mod ui;
 mod utils;
 
-use app::state::{AppState, InputMode, Panel, EditorField};
+use app::state::{AppState, InputMode, Panel, EditorField, ProtocolType};
 use app::actions::Action;
 use crossterm::{
     event::{self, Event, KeyCode, KeyEvent, KeyModifiers, poll},
@@ -282,6 +282,27 @@ async fn main() -> anyhow::Result<()> {
                     if let Some(request) = state.requests.last() {
                         let _ = storage.save_request(request);
                     }
+                }
+                (KeyCode::Char('g'), KeyModifiers::NONE) => {
+                    Action::NewGrpcRequest.execute(&mut state);
+                    if let Some(request) = state.grpc_requests.last() {
+                        let _ = storage.save_grpc_request(request);
+                    }
+                }
+                (KeyCode::Char('p'), KeyModifiers::NONE) => {
+                    // Toggle protocol type
+                    state.protocol_type = match state.protocol_type {
+                        ProtocolType::Http => ProtocolType::Grpc,
+                        ProtocolType::Grpc => ProtocolType::Http,
+                    };
+                    // Reset selection when switching protocols
+                    state.selected_request = if state.protocol_type == ProtocolType::Http && !state.requests.is_empty() {
+                        Some(0)
+                    } else if state.protocol_type == ProtocolType::Grpc && !state.grpc_requests.is_empty() {
+                        Some(0)
+                    } else {
+                        None
+                    };
                 }
                 (KeyCode::Char('d'), KeyModifiers::NONE) => {
                     if let Some(idx) = state.selected_request {
