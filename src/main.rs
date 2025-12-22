@@ -148,8 +148,10 @@ async fn main() -> anyhow::Result<()> {
     
     let http_client = http::client::HttpClient::new()?;
     let (response_tx, mut response_rx) = mpsc::channel::<HttpResult>(32);
-    
+    let (grpc_response_tx, mut grpc_response_rx) = mpsc::channel::<GrpcResult>(32);
+
     loop {
+        // Handle HTTP responses
         while let Ok(result) = response_rx.try_recv() {
             match result {
                 HttpResult::Success(response) => {
@@ -176,7 +178,35 @@ async fn main() -> anyhow::Result<()> {
             }
             state.is_loading = false;
         }
-        
+
+        // Handle gRPC responses
+        while let Ok(result) = grpc_response_rx.try_recv() {
+            match result {
+                GrpcResult::Success(response) => {
+                    state.grpc_response = Some(response);
+                    state.loading_message.clear();
+                }
+                GrpcResult::Error(error_msg) => {
+                    let error_response = models::GrpcResponse {
+                        id: Uuid::new_v4(),
+                        request_id: Uuid::new_v4(),
+                        status: models::GrpcStatus {
+                            code: 2, // UNKNOWN error code
+                            message: error_msg.clone(),
+                        },
+                        messages: vec![],
+                        metadata: std::collections::HashMap::new(),
+                        trailers: std::collections::HashMap::new(),
+                        duration_ms: 0,
+                        timestamp: chrono::Utc::now(),
+                    };
+                    state.grpc_response = Some(error_response);
+                    state.loading_message.clear();
+                }
+            }
+            state.is_loading = false;
+        }
+
         terminal.draw(|frame| {
             ui::app::UI::draw(frame, &state);
         })?;
@@ -260,23 +290,48 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
                 (KeyCode::Enter, KeyModifiers::NONE) => {
-                    if let Some(request) = state.get_current_request().cloned() {
-                        if !state.is_loading {
-                            state.is_loading = true;
-                            state.loading_message = format!("Sending {} request...", request.method.as_str());
-                            state.reset_response_scroll();
-                            state.current_response = None;
-                            
-                            let client = http_client.clone();
-                            let tx = response_tx.clone();
-                            
-                            tokio::spawn(async move {
-                                let result = match client.execute(&request).await {
-                                    Ok(response) => HttpResult::Success(response),
-                                    Err(e) => HttpResult::Error(e.to_string()),
-                                };
-                                let _ = tx.send(result).await;
-                            });
+                    match state.protocol_type {
+                        ProtocolType::Http => {
+                            if let Some(request) = state.get_current_request().cloned() {
+                                if !state.is_loading {
+                                    state.is_loading = true;
+                                    state.loading_message = format!("Sending {} request...", request.method.as_str());
+                                    state.reset_response_scroll();
+                                    state.current_response = None;
+
+                                    let client = http_client.clone();
+                                    let tx = response_tx.clone();
+
+                                    tokio::spawn(async move {
+                                        let result = match client.execute(&request).await {
+                                            Ok(response) => HttpResult::Success(response),
+                                            Err(e) => HttpResult::Error(e.to_string()),
+                                        };
+                                        let _ = tx.send(result).await;
+                                    });
+                                }
+                            }
+                        }
+                        ProtocolType::Grpc => {
+                            if let Some(request) = state.get_current_grpc_request().cloned() {
+                                if !state.is_loading {
+                                    state.is_loading = true;
+                                    state.loading_message = format!("Calling gRPC method {}...", request.method_name);
+                                    state.reset_response_scroll();
+                                    state.grpc_response = None;
+
+                                    let tx = grpc_response_tx.clone();
+
+                                    tokio::spawn(async move {
+                                        let grpc_client = grpc::client::GrpcClient::new();
+                                        let result = match grpc_client.execute_unary(&request).await {
+                                            Ok(response) => GrpcResult::Success(response),
+                                            Err(e) => GrpcResult::Error(e.to_string()),
+                                        };
+                                        let _ = tx.send(result).await;
+                                    });
+                                }
+                            }
                         }
                     }
                 }
