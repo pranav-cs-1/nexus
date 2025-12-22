@@ -1,9 +1,10 @@
-use crate::app::state::AppState;
+use crate::app::state::{AppState, ProtocolType};
 use crate::ui::{
     components::{
         collection_list::CollectionList,
         request_list::RequestList,
         request_editor::RequestEditor,
+        grpc_editor::GrpcEditor,
         response_viewer::ResponseViewer,
         statusbar::StatusBar,
         help_popup::HelpPopup,
@@ -49,8 +50,16 @@ impl UI {
     }
     
     fn draw_editor(frame: &mut Frame, area: Rect, state: &AppState) {
-        let component = RequestEditor::new(state);
-        frame.render_widget(component, area);
+        match state.protocol_type {
+            ProtocolType::Http => {
+                let component = RequestEditor::new(state);
+                frame.render_widget(component, area);
+            }
+            ProtocolType::Grpc => {
+                let component = GrpcEditor::new(state);
+                frame.render_widget(component, area);
+            }
+        }
     }
     
     fn draw_response(frame: &mut Frame, area: Rect, state: &AppState) {

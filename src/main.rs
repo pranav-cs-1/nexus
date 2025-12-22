@@ -210,7 +210,10 @@ async fn main() -> anyhow::Result<()> {
             }
             
             if state.input_mode == InputMode::Editing {
-                handle_edit_mode(&mut state, key, &storage);
+                match state.protocol_type {
+                    ProtocolType::Http => handle_edit_mode(&mut state, key, &storage),
+                    ProtocolType::Grpc => handle_grpc_edit_mode(&mut state, key, &storage),
+                }
                 continue;
             }
             
@@ -321,10 +324,20 @@ async fn main() -> anyhow::Result<()> {
                 }
                 (KeyCode::Char('e'), KeyModifiers::NONE) => {
                     if state.focused_panel == Panel::RequestEditor {
-                        state.load_current_request_to_input();
-                        state.input_mode = InputMode::Editing;
-                        // Start with Name field
-                        state.editor_focused_field = EditorField::Name;
+                        match state.protocol_type {
+                            ProtocolType::Http => {
+                                state.load_current_request_to_input();
+                                state.input_mode = InputMode::Editing;
+                                // Start with Name field
+                                state.editor_focused_field = EditorField::Name;
+                            }
+                            ProtocolType::Grpc => {
+                                state.load_current_grpc_request_to_input();
+                                state.input_mode = InputMode::Editing;
+                                // Start with ServerUrl field
+                                state.grpc_editor_focused_field = app::state::GrpcEditorField::ServerUrl;
+                            }
+                        }
                     } else if state.focused_panel == Panel::Collections {
                         Action::EditCollection.execute(&mut state);
                     }
@@ -1351,6 +1364,364 @@ fn move_cursor_to_line_end(text: &str, cursor_pos: usize) -> usize {
         .find('\n')
         .map(|pos| cursor_pos + pos)
         .unwrap_or(text.len())
+}
+
+// gRPC Edit Mode Handlers
+
+fn handle_grpc_edit_mode(state: &mut AppState, key: KeyEvent, storage: &storage::Storage) {
+    match key.code {
+        KeyCode::Esc => {
+            // Similar to HTTP edit mode handling
+            if state.grpc_editor_focused_field == app::state::GrpcEditorField::Metadata &&
+               state.kv_edit_mode != app::state::KeyValueEditMode::None {
+                handle_grpc_metadata_edit(state, key);
+            } else {
+                // Exit edit mode and save
+                state.save_grpc_input_to_request();
+                if let Some(request) = state.get_current_grpc_request() {
+                    let _ = storage.save_grpc_request(request);
+                }
+                state.input_mode = InputMode::Normal;
+                state.kv_edit_mode = app::state::KeyValueEditMode::None;
+            }
+        }
+        KeyCode::Tab => {
+            if state.grpc_editor_focused_field == app::state::GrpcEditorField::Metadata &&
+               state.kv_edit_mode != app::state::KeyValueEditMode::None {
+                handle_grpc_metadata_edit(state, key);
+            } else {
+                // Switch fields forward
+                state.kv_edit_mode = app::state::KeyValueEditMode::None;
+                state.grpc_editor_focused_field = match state.grpc_editor_focused_field {
+                    app::state::GrpcEditorField::Name => app::state::GrpcEditorField::ServerUrl,
+                    app::state::GrpcEditorField::ServerUrl => app::state::GrpcEditorField::ServiceName,
+                    app::state::GrpcEditorField::ServiceName => app::state::GrpcEditorField::MethodName,
+                    app::state::GrpcEditorField::MethodName => app::state::GrpcEditorField::Message,
+                    app::state::GrpcEditorField::Message => app::state::GrpcEditorField::Metadata,
+                    app::state::GrpcEditorField::Metadata => app::state::GrpcEditorField::Name,
+                };
+            }
+        }
+        KeyCode::BackTab => {
+            if state.grpc_editor_focused_field == app::state::GrpcEditorField::Metadata &&
+               state.kv_edit_mode != app::state::KeyValueEditMode::None {
+                handle_grpc_metadata_edit(state, key);
+            } else {
+                // Switch fields backward
+                state.kv_edit_mode = app::state::KeyValueEditMode::None;
+                state.grpc_editor_focused_field = match state.grpc_editor_focused_field {
+                    app::state::GrpcEditorField::Name => app::state::GrpcEditorField::Metadata,
+                    app::state::GrpcEditorField::ServerUrl => app::state::GrpcEditorField::Name,
+                    app::state::GrpcEditorField::ServiceName => app::state::GrpcEditorField::ServerUrl,
+                    app::state::GrpcEditorField::MethodName => app::state::GrpcEditorField::ServiceName,
+                    app::state::GrpcEditorField::Message => app::state::GrpcEditorField::MethodName,
+                    app::state::GrpcEditorField::Metadata => app::state::GrpcEditorField::Message,
+                };
+            }
+        }
+        _ => {
+            match state.grpc_editor_focused_field {
+                app::state::GrpcEditorField::Name => handle_grpc_name_edit(state, key),
+                app::state::GrpcEditorField::ServerUrl => handle_grpc_server_url_edit(state, key),
+                app::state::GrpcEditorField::ServiceName => handle_grpc_service_name_edit(state, key),
+                app::state::GrpcEditorField::MethodName => handle_grpc_method_name_edit(state, key),
+                app::state::GrpcEditorField::Message => handle_grpc_message_edit(state, key),
+                app::state::GrpcEditorField::Metadata => handle_grpc_metadata_edit(state, key),
+            }
+        }
+    }
+}
+
+fn handle_grpc_name_edit(state: &mut AppState, key: KeyEvent) {
+    match (key.code, key.modifiers) {
+        (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+            state.grpc_name_input.clear();
+            state.grpc_name_cursor = 0;
+        }
+        (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
+            state.grpc_name_input.insert(state.grpc_name_cursor, c);
+            state.grpc_name_cursor += 1;
+        }
+        (KeyCode::Backspace, _) => {
+            if state.grpc_name_cursor > 0 {
+                state.grpc_name_cursor -= 1;
+                state.grpc_name_input.remove(state.grpc_name_cursor);
+            }
+        }
+        (KeyCode::Delete, _) => {
+            if state.grpc_name_cursor < state.grpc_name_input.len() {
+                state.grpc_name_input.remove(state.grpc_name_cursor);
+            }
+        }
+        (KeyCode::Left, _) => {
+            if state.grpc_name_cursor > 0 {
+                state.grpc_name_cursor -= 1;
+            }
+        }
+        (KeyCode::Right, _) => {
+            if state.grpc_name_cursor < state.grpc_name_input.len() {
+                state.grpc_name_cursor += 1;
+            }
+        }
+        (KeyCode::Home, _) => {
+            state.grpc_name_cursor = 0;
+        }
+        (KeyCode::End, _) => {
+            state.grpc_name_cursor = state.grpc_name_input.len();
+        }
+        _ => {}
+    }
+}
+
+fn handle_grpc_server_url_edit(state: &mut AppState, key: KeyEvent) {
+    match (key.code, key.modifiers) {
+        (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+            state.grpc_server_url_input.clear();
+            state.grpc_server_url_cursor = 0;
+        }
+        (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
+            state.grpc_server_url_input.insert(state.grpc_server_url_cursor, c);
+            state.grpc_server_url_cursor += 1;
+        }
+        (KeyCode::Backspace, _) => {
+            if state.grpc_server_url_cursor > 0 {
+                state.grpc_server_url_cursor -= 1;
+                state.grpc_server_url_input.remove(state.grpc_server_url_cursor);
+            }
+        }
+        (KeyCode::Delete, _) => {
+            if state.grpc_server_url_cursor < state.grpc_server_url_input.len() {
+                state.grpc_server_url_input.remove(state.grpc_server_url_cursor);
+            }
+        }
+        (KeyCode::Left, _) => {
+            if state.grpc_server_url_cursor > 0 {
+                state.grpc_server_url_cursor -= 1;
+            }
+        }
+        (KeyCode::Right, _) => {
+            if state.grpc_server_url_cursor < state.grpc_server_url_input.len() {
+                state.grpc_server_url_cursor += 1;
+            }
+        }
+        (KeyCode::Home, _) => {
+            state.grpc_server_url_cursor = 0;
+        }
+        (KeyCode::End, _) => {
+            state.grpc_server_url_cursor = state.grpc_server_url_input.len();
+        }
+        _ => {}
+    }
+}
+
+fn handle_grpc_service_name_edit(state: &mut AppState, key: KeyEvent) {
+    match (key.code, key.modifiers) {
+        (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+            state.grpc_service_name_input.clear();
+            state.grpc_service_name_cursor = 0;
+        }
+        (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
+            state.grpc_service_name_input.insert(state.grpc_service_name_cursor, c);
+            state.grpc_service_name_cursor += 1;
+        }
+        (KeyCode::Backspace, _) => {
+            if state.grpc_service_name_cursor > 0 {
+                state.grpc_service_name_cursor -= 1;
+                state.grpc_service_name_input.remove(state.grpc_service_name_cursor);
+            }
+        }
+        (KeyCode::Delete, _) => {
+            if state.grpc_service_name_cursor < state.grpc_service_name_input.len() {
+                state.grpc_service_name_input.remove(state.grpc_service_name_cursor);
+            }
+        }
+        (KeyCode::Left, _) => {
+            if state.grpc_service_name_cursor > 0 {
+                state.grpc_service_name_cursor -= 1;
+            }
+        }
+        (KeyCode::Right, _) => {
+            if state.grpc_service_name_cursor < state.grpc_service_name_input.len() {
+                state.grpc_service_name_cursor += 1;
+            }
+        }
+        (KeyCode::Home, _) => {
+            state.grpc_service_name_cursor = 0;
+        }
+        (KeyCode::End, _) => {
+            state.grpc_service_name_cursor = state.grpc_service_name_input.len();
+        }
+        _ => {}
+    }
+}
+
+fn handle_grpc_method_name_edit(state: &mut AppState, key: KeyEvent) {
+    match (key.code, key.modifiers) {
+        (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+            state.grpc_method_name_input.clear();
+            state.grpc_method_name_cursor = 0;
+        }
+        (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
+            state.grpc_method_name_input.insert(state.grpc_method_name_cursor, c);
+            state.grpc_method_name_cursor += 1;
+        }
+        (KeyCode::Backspace, _) => {
+            if state.grpc_method_name_cursor > 0 {
+                state.grpc_method_name_cursor -= 1;
+                state.grpc_method_name_input.remove(state.grpc_method_name_cursor);
+            }
+        }
+        (KeyCode::Delete, _) => {
+            if state.grpc_method_name_cursor < state.grpc_method_name_input.len() {
+                state.grpc_method_name_input.remove(state.grpc_method_name_cursor);
+            }
+        }
+        (KeyCode::Left, _) => {
+            if state.grpc_method_name_cursor > 0 {
+                state.grpc_method_name_cursor -= 1;
+            }
+        }
+        (KeyCode::Right, _) => {
+            if state.grpc_method_name_cursor < state.grpc_method_name_input.len() {
+                state.grpc_method_name_cursor += 1;
+            }
+        }
+        (KeyCode::Home, _) => {
+            state.grpc_method_name_cursor = 0;
+        }
+        (KeyCode::End, _) => {
+            state.grpc_method_name_cursor = state.grpc_method_name_input.len();
+        }
+        _ => {}
+    }
+}
+
+fn handle_grpc_message_edit(state: &mut AppState, key: KeyEvent) {
+    match (key.code, key.modifiers) {
+        (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+            state.grpc_message_input.clear();
+            state.grpc_message_cursor = 0;
+        }
+        (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
+            state.grpc_message_input.insert(state.grpc_message_cursor, c);
+            state.grpc_message_cursor += 1;
+        }
+        (KeyCode::Backspace, _) => {
+            if state.grpc_message_cursor > 0 {
+                state.grpc_message_cursor -= 1;
+                state.grpc_message_input.remove(state.grpc_message_cursor);
+            }
+        }
+        (KeyCode::Delete, _) => {
+            if state.grpc_message_cursor < state.grpc_message_input.len() {
+                state.grpc_message_input.remove(state.grpc_message_cursor);
+            }
+        }
+        (KeyCode::Left, _) => {
+            if state.grpc_message_cursor > 0 {
+                state.grpc_message_cursor -= 1;
+            }
+        }
+        (KeyCode::Right, _) => {
+            if state.grpc_message_cursor < state.grpc_message_input.len() {
+                state.grpc_message_cursor += 1;
+            }
+        }
+        (KeyCode::Up, _) => {
+            state.grpc_message_cursor = move_cursor_up(&state.grpc_message_input, state.grpc_message_cursor);
+        }
+        (KeyCode::Down, _) => {
+            state.grpc_message_cursor = move_cursor_down(&state.grpc_message_input, state.grpc_message_cursor);
+        }
+        (KeyCode::Home, KeyModifiers::CONTROL) => {
+            state.grpc_message_cursor = 0;
+        }
+        (KeyCode::End, KeyModifiers::CONTROL) => {
+            state.grpc_message_cursor = state.grpc_message_input.len();
+        }
+        (KeyCode::Home, _) => {
+            state.grpc_message_cursor = move_cursor_to_line_start(&state.grpc_message_input, state.grpc_message_cursor);
+        }
+        (KeyCode::End, _) => {
+            state.grpc_message_cursor = move_cursor_to_line_end(&state.grpc_message_input, state.grpc_message_cursor);
+        }
+        (KeyCode::Enter, _) => {
+            state.grpc_message_input.insert(state.grpc_message_cursor, '\n');
+            state.grpc_message_cursor += 1;
+        }
+        _ => {}
+    }
+}
+
+fn handle_grpc_metadata_edit(state: &mut AppState, key: KeyEvent) {
+    match key.code {
+        KeyCode::Char('+') => {
+            if state.kv_edit_mode == app::state::KeyValueEditMode::None {
+                state.add_grpc_metadata();
+            }
+        }
+        KeyCode::Char('-') => {
+            if state.kv_edit_mode == app::state::KeyValueEditMode::None {
+                state.delete_grpc_metadata();
+            }
+        }
+        KeyCode::Up => {
+            if state.kv_edit_mode == app::state::KeyValueEditMode::None {
+                if state.grpc_metadata_selected > 0 {
+                    state.grpc_metadata_selected -= 1;
+                }
+            }
+        }
+        KeyCode::Down => {
+            if state.kv_edit_mode == app::state::KeyValueEditMode::None {
+                if state.grpc_metadata_selected < state.grpc_metadata_input.len().saturating_sub(1) {
+                    state.grpc_metadata_selected += 1;
+                }
+            }
+        }
+        KeyCode::Enter => {
+            if state.kv_edit_mode == app::state::KeyValueEditMode::None {
+                state.kv_edit_mode = app::state::KeyValueEditMode::Key;
+            }
+        }
+        KeyCode::Tab => {
+            if state.kv_edit_mode == app::state::KeyValueEditMode::Key {
+                state.kv_edit_mode = app::state::KeyValueEditMode::Value;
+            } else if state.kv_edit_mode == app::state::KeyValueEditMode::Value {
+                state.kv_edit_mode = app::state::KeyValueEditMode::Key;
+            }
+        }
+        KeyCode::Esc => {
+            state.kv_edit_mode = app::state::KeyValueEditMode::None;
+        }
+        KeyCode::Char(c) => {
+            if let Some((key, value)) = state.grpc_metadata_input.get_mut(state.grpc_metadata_selected) {
+                match state.kv_edit_mode {
+                    app::state::KeyValueEditMode::Key => {
+                        key.push(c);
+                    }
+                    app::state::KeyValueEditMode::Value => {
+                        value.push(c);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        KeyCode::Backspace => {
+            if let Some((key, value)) = state.grpc_metadata_input.get_mut(state.grpc_metadata_selected) {
+                match state.kv_edit_mode {
+                    app::state::KeyValueEditMode::Key => {
+                        key.pop();
+                    }
+                    app::state::KeyValueEditMode::Value => {
+                        value.pop();
+                    }
+                    _ => {}
+                }
+            }
+        }
+        _ => {}
+    }
 }
 
 
