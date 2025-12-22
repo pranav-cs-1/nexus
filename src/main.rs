@@ -1,4 +1,5 @@
 mod app;
+mod grpc;
 mod http;
 mod import;
 mod models;

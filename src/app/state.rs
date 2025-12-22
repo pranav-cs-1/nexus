@@ -2,6 +2,9 @@ use crate::models::{
     collection::Collection,
     request::HttpRequest,
     response::HttpResponse,
+    GrpcRequest,
+    GrpcResponse,
+    ProtoSchema,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -57,6 +60,12 @@ pub enum KeyValueEditMode {
     Value,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ProtocolType {
+    Http,
+    Grpc,
+}
+
 #[derive(Debug)]
 pub struct AppState {
     pub collections: Vec<Collection>,
@@ -110,7 +119,13 @@ pub struct AppState {
     
     // Response viewer scroll state
     pub response_scroll: u16,
-    
+
+    // gRPC support
+    pub protocol_type: ProtocolType,
+    pub grpc_requests: Vec<GrpcRequest>,
+    pub grpc_response: Option<GrpcResponse>,
+    pub proto_schemas: Vec<ProtoSchema>,
+
     pub should_quit: bool,
 }
 
@@ -165,7 +180,13 @@ impl AppState {
             auth_cursor: 0,
             
             response_scroll: 0,
-            
+
+            // gRPC support
+            protocol_type: ProtocolType::Http,
+            grpc_requests: Vec::new(),
+            grpc_response: None,
+            proto_schemas: Vec::new(),
+
             should_quit: false,
         }
     }
