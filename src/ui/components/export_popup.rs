@@ -3,7 +3,7 @@ use crate::ui::theme::Theme;
 use ratatui::{
     layout::Rect,
     text::Line,
-    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Widget},
+    widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Widget},
     style::Style,
 };
 
@@ -40,7 +40,8 @@ impl<'a> ExportPopup<'a> {
         let block = Block::default()
             .title("Export Complete")
             .borders(Borders::ALL)
-            .border_style(Theme::focused_border());
+            .border_style(Theme::focused_border())
+            .border_type(BorderType::Rounded);
         
         if let Some(export_result) = &self.state.export_result_message {
             let lines = vec![
@@ -90,7 +91,8 @@ impl<'a> ExportPopup<'a> {
             let block = Block::default()
                 .title(title)
                 .borders(Borders::ALL)
-                .border_style(Theme::focused_border());
+                .border_style(Theme::focused_border())
+                .border_type(BorderType::Rounded);
             
             let paragraph = Paragraph::new(vec![
                 Line::from(""),
@@ -106,6 +108,7 @@ impl<'a> ExportPopup<'a> {
                     .title(format!("{} - Use ↑↓ to select, Enter to continue, Esc to cancel", title))
                     .borders(Borders::ALL)
                     .border_style(Theme::focused_border())
+                    .border_type(BorderType::Rounded)
             );
             Widget::render(list, area, buf);
         }
@@ -127,7 +130,8 @@ impl<'a> ExportPopup<'a> {
         let block = Block::default()
             .title(title)
             .borders(Borders::ALL)
-            .border_style(Theme::focused_border());
+            .border_style(Theme::focused_border())
+            .border_type(BorderType::Rounded);
 
         if let Some(collection_idx) = self.state.export_selected_collection {
             if let Some(collection) = self.state.collections.get(collection_idx) {
@@ -170,6 +174,7 @@ impl<'a> ExportPopup<'a> {
                                     .title(nav_title)
                                     .borders(Borders::ALL)
                                     .border_style(Theme::focused_border())
+                                    .border_type(BorderType::Rounded)
                             );
                             Widget::render(list, area, buf);
                         }
@@ -212,6 +217,7 @@ impl<'a> ExportPopup<'a> {
                                     .title(nav_title)
                                     .borders(Borders::ALL)
                                     .border_style(Theme::focused_border())
+                                    .border_type(BorderType::Rounded)
                             );
                             Widget::render(list, area, buf);
                         }
