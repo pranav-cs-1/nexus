@@ -3,7 +3,7 @@ use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Tabs, Widget, Wrap},
+    widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Tabs, Widget, Wrap},
     style::Style,
 };
 
@@ -37,7 +37,8 @@ impl<'a> Widget for RequestEditor<'a> {
         let block = Block::default()
             .title(title)
             .borders(Borders::ALL)
-            .border_style(border_style);
+            .border_style(border_style)
+            .border_type(BorderType::Rounded);
         
         let inner_area = block.inner(area);
         block.render(area, buf);
@@ -99,7 +100,8 @@ impl<'a> RequestEditor<'a> {
         let block = Block::default()
             .title("Name")
             .borders(Borders::ALL)
-            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
+            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() })
+            .border_type(BorderType::Rounded);
         
         let text = if is_editing {
             let display_text = &self.state.name_input;
@@ -152,7 +154,8 @@ impl<'a> RequestEditor<'a> {
         let block = Block::default()
             .title("Method")
             .borders(Borders::ALL)
-            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
+            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() })
+            .border_type(BorderType::Rounded);
         
         let text = if is_editing {
             let methods = crate::models::request::HttpMethod::all();
@@ -175,7 +178,8 @@ impl<'a> RequestEditor<'a> {
         let block = Block::default()
             .title("URL")
             .borders(Borders::ALL)
-            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
+            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() })
+            .border_type(BorderType::Rounded);
         
         let text = if is_editing {
             let display_text = &self.state.url_input;
@@ -238,7 +242,8 @@ impl<'a> RequestEditor<'a> {
         let block = Block::default()
             .title(title)
             .borders(Borders::ALL)
-            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
+            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() })
+            .border_type(BorderType::Rounded);
         
         if is_editing {
             let items: Vec<ListItem> = self.state.params_input
@@ -306,7 +311,8 @@ impl<'a> RequestEditor<'a> {
         let block = Block::default()
             .title(title)
             .borders(Borders::ALL)
-            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
+            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() })
+            .border_type(BorderType::Rounded);
         
         if is_editing {
             let items: Vec<ListItem> = self.state.headers_input
@@ -364,7 +370,8 @@ impl<'a> RequestEditor<'a> {
         let block = Block::default()
             .title("Body")
             .borders(Borders::ALL)
-            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
+            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() })
+            .border_type(BorderType::Rounded);
         
         let mut display_text = if is_editing {
             self.state.body_input.clone()
@@ -392,7 +399,8 @@ impl<'a> RequestEditor<'a> {
         let block = Block::default()
             .title("Authentication (Bearer Token)")
             .borders(Borders::ALL)
-            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
+            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() })
+            .border_type(BorderType::Rounded);
         
         let mut display_text = if is_editing {
             self.state.auth_input.clone()

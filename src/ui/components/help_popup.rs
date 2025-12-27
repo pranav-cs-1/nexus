@@ -2,7 +2,7 @@ use crate::ui::theme::Theme;
 use ratatui::{
     layout::Rect,
     text::Line,
-    widgets::{Block, Borders, Clear, Paragraph, Widget},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget},
 };
 
 pub struct HelpPopup;
@@ -20,7 +20,8 @@ impl Widget for HelpPopup {
         let block = Block::default()
             .title("Help")
             .borders(Borders::ALL)
-            .border_style(Theme::focused_border());
+            .border_style(Theme::focused_border())
+            .border_type(BorderType::Rounded);
         
         let help_text = vec![
             "",

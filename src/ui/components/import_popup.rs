@@ -3,7 +3,7 @@ use crate::ui::theme::Theme;
 use ratatui::{
     layout::Rect,
     text::Line,
-    widgets::{Block, Borders, Clear, Paragraph, Widget},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget},
 };
 
 pub struct ImportPopup<'a> {
@@ -33,7 +33,8 @@ impl<'a> ImportPopup<'a> {
         let block = Block::default()
             .title("Import Postman Collection")
             .borders(Borders::ALL)
-            .border_style(Theme::focused_border());
+            .border_style(Theme::focused_border())
+            .border_type(BorderType::Rounded);
 
         let cursor_pos = self.state.import_file_cursor;
         let input_value = &self.state.import_file_input;
@@ -79,7 +80,8 @@ impl<'a> ImportPopup<'a> {
         let block = Block::default()
             .title(title)
             .borders(Borders::ALL)
-            .border_style(Theme::focused_border());
+            .border_style(Theme::focused_border())
+            .border_type(BorderType::Rounded);
 
         let lines = vec![
             Line::from(""),

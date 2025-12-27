@@ -3,7 +3,7 @@ use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph, Widget, Wrap},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget, Wrap},
     style::{Color, Style},
 };
 
@@ -25,7 +25,8 @@ impl<'a> Widget for ProtoLoaderPopup<'a> {
         let block = Block::default()
             .title("Load Proto File")
             .borders(Borders::ALL)
-            .border_style(Theme::focused_border());
+            .border_style(Theme::focused_border())
+            .border_type(BorderType::Rounded);
 
         let inner_area = block.inner(area);
         block.render(area, buf);
@@ -45,7 +46,7 @@ impl<'a> Widget for ProtoLoaderPopup<'a> {
             Line::from(""),
             Line::from(Span::styled("Enter the path to your proto descriptor file (.pb)", Style::default().fg(Color::Cyan))),
             Line::from(""),
-            Line::from(Span::styled("Generate with:", Style::default().fg(Color::Yellow))),
+            Line::from(Span::styled("Generate with:", Style::default().fg(Color::Cyan))),
             Line::from("  protoc --descriptor_set_out=service.pb --include_imports service.proto"),
         ];
 
@@ -58,7 +59,8 @@ impl<'a> Widget for ProtoLoaderPopup<'a> {
         let input_block = Block::default()
             .title("File Path")
             .borders(Borders::ALL)
-            .border_style(if input_focused { Theme::selected() } else { Theme::unfocused_border() });
+            .border_style(if input_focused { Theme::selected() } else { Theme::unfocused_border() })
+            .border_type(BorderType::Rounded);
 
         let display_text = &self.state.proto_file_input;
         let cursor_pos = self.state.proto_file_cursor;
@@ -113,7 +115,8 @@ impl<'a> Widget for ProtoLoaderPopup<'a> {
             let schemas_block = Block::default()
                 .title(format!("Loaded Proto Schemas ({})", self.state.proto_schemas.len()))
                 .borders(Borders::ALL)
-                .border_style(if list_focused { Theme::selected() } else { Theme::unfocused_border() });
+                .border_style(if list_focused { Theme::selected() } else { Theme::unfocused_border() })
+                .border_type(BorderType::Rounded);
 
             let schema_lines: Vec<Line> = self.state.proto_schemas
                 .iter()

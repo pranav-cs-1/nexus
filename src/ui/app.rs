@@ -20,9 +20,9 @@ use ratatui::{Frame, layout::{Constraint, Direction, Layout as RatatuiLayout, Re
 pub struct UI;
 
 impl UI {
-    pub fn draw(frame: &mut Frame, state: &AppState) {
+    pub fn draw(frame: &mut Frame, state: &mut AppState) {
         let layout = Layout::new(frame.area());
-        
+
         Self::draw_collections(frame, layout.collections, state);
         Self::draw_requests(frame, layout.requests, state);
         Self::draw_editor(frame, layout.editor, state);
@@ -42,17 +42,17 @@ impl UI {
         }
     }
     
-    fn draw_collections(frame: &mut Frame, area: Rect, state: &AppState) {
+    fn draw_collections(frame: &mut Frame, area: Rect, state: &mut AppState) {
         let component = CollectionList::new(state);
         frame.render_widget(component, area);
     }
-    
-    fn draw_requests(frame: &mut Frame, area: Rect, state: &AppState) {
+
+    fn draw_requests(frame: &mut Frame, area: Rect, state: &mut AppState) {
         let component = RequestList::new(state);
         frame.render_widget(component, area);
     }
-    
-    fn draw_editor(frame: &mut Frame, area: Rect, state: &AppState) {
+
+    fn draw_editor(frame: &mut Frame, area: Rect, state: &mut AppState) {
         match state.protocol_type {
             ProtocolType::Http => {
                 let component = RequestEditor::new(state);
@@ -64,42 +64,42 @@ impl UI {
             }
         }
     }
-    
-    fn draw_response(frame: &mut Frame, area: Rect, state: &AppState) {
+
+    fn draw_response(frame: &mut Frame, area: Rect, state: &mut AppState) {
         let component = ResponseViewer::new(state);
         frame.render_widget(component, area);
     }
-    
-    fn draw_statusbar(frame: &mut Frame, area: Rect, state: &AppState) {
+
+    fn draw_statusbar(frame: &mut Frame, area: Rect, state: &mut AppState) {
         let component = StatusBar::new(state);
         frame.render_widget(component, area);
     }
-    
-    fn draw_help(frame: &mut Frame, _state: &AppState) {
+
+    fn draw_help(frame: &mut Frame, _state: &mut AppState) {
         let component = HelpPopup::new();
         let area = Self::centered_rect(frame.area(), 60, 80);
         frame.render_widget(component, area);
     }
-    
-    fn draw_welcome(frame: &mut Frame, _state: &AppState) {
+
+    fn draw_welcome(frame: &mut Frame, _state: &mut AppState) {
         let component = WelcomePopup::new();
         let area = Self::centered_rect(frame.area(), 70, 90);
         frame.render_widget(component, area);
     }
-    
-    fn draw_export_menu(frame: &mut Frame, state: &AppState) {
+
+    fn draw_export_menu(frame: &mut Frame, state: &mut AppState) {
         let component = ExportPopup::new(state);
         let area = Self::centered_rect(frame.area(), 60, 50);
         frame.render_widget(component, area);
     }
 
-    fn draw_import_menu(frame: &mut Frame, state: &AppState) {
+    fn draw_import_menu(frame: &mut Frame, state: &mut AppState) {
         let component = ImportPopup::new(state);
         let area = Self::centered_rect(frame.area(), 70, 40);
         frame.render_widget(component, area);
     }
 
-    fn draw_proto_loader(frame: &mut Frame, state: &AppState) {
+    fn draw_proto_loader(frame: &mut Frame, state: &mut AppState) {
         let component = ProtoLoaderPopup::new(state);
         let area = Self::centered_rect(frame.area(), 80, 50);
         frame.render_widget(component, area);

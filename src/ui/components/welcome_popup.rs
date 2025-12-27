@@ -2,7 +2,7 @@ use crate::ui::theme::Theme;
 use ratatui::{
     layout::Rect,
     text::Line,
-    widgets::{Block, Borders, Clear, Paragraph, Widget},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph, Widget},
     style::{Style, Color, Modifier},
 };
 
@@ -21,7 +21,8 @@ impl Widget for WelcomePopup {
         let block = Block::default()
             .title("Welcome to Nexus")
             .borders(Borders::ALL)
-            .border_style(Theme::focused_border());
+            .border_style(Theme::focused_border())
+            .border_type(BorderType::Rounded);
         
         let welcome_text = vec![
             "",
