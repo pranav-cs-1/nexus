@@ -3,7 +3,7 @@ use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Widget, Wrap},
+    widgets::{Block, BorderType, Borders, Paragraph, Widget, Wrap},
     style::{Color, Style},
 };
 
@@ -155,24 +155,25 @@ impl<'a> ResponseViewer<'a> {
 impl<'a> Widget for ResponseViewer<'a> {
     fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
         let is_focused = self.state.focused_panel == Panel::Response;
-        
+
         let border_style = if is_focused {
             Theme::focused_border()
         } else {
             Theme::unfocused_border()
         };
-        
+
         let title = if is_focused {
             format!("Response [↑/↓ scroll, c: copy | line {}]", self.state.response_scroll + 1)
         } else {
             "Response".to_string()
         };
-        
+
         let block = Block::default()
             .title(title)
             .borders(Borders::ALL)
-            .border_style(border_style);
-        
+            .border_style(border_style)
+            .border_type(BorderType::Rounded);
+
         match self.state.protocol_type {
             ProtocolType::Http => {
                 if let Some(response) = &self.state.current_response {

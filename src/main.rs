@@ -213,7 +213,7 @@ async fn main() -> anyhow::Result<()> {
         }
 
         terminal.draw(|frame| {
-            ui::app::UI::draw(frame, &state);
+            ui::app::UI::draw(frame, &mut state);
         })?;
         
         if poll(std::time::Duration::from_millis(100))? {
@@ -261,7 +261,12 @@ async fn main() -> anyhow::Result<()> {
                 handle_collection_edit_mode(&mut state, key, &storage);
                 continue;
             }
-            
+
+            if state.request_search_mode {
+                handle_request_search_mode(&mut state, key);
+                continue;
+            }
+
             match (key.code, key.modifiers) {
                 (KeyCode::Char('q'), KeyModifiers::NONE) => {
                     Action::Quit.execute(&mut state);
@@ -367,16 +372,34 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
                 (KeyCode::Char('g'), KeyModifiers::NONE) => {
-                    // Create new gRPC request and switch to gRPC mode
-                    state.protocol_type = ProtocolType::Grpc;
-                    Action::NewGrpcRequest.execute(&mut state);
-                    if let Some(request) = state.grpc_requests.last() {
-                        let _ = storage.save_grpc_request(request);
+                    // Jump to first request when in Requests panel
+                    if state.focused_panel == Panel::Requests {
+                        Action::FirstRequest.execute(&mut state);
                     }
-                    state.current_response = None;
-                    state.grpc_response = None;
-                    state.clear_input_buffers();
-                    state.reset_response_scroll();
+                }
+                (KeyCode::Char('G'), KeyModifiers::SHIFT) => {
+                    // Jump to last request when in Requests panel
+                    if state.focused_panel == Panel::Requests {
+                        Action::LastRequest.execute(&mut state);
+                    }
+                }
+                (KeyCode::Char('f'), KeyModifiers::CONTROL) => {
+                    // Page down when in Requests panel
+                    if state.focused_panel == Panel::Requests {
+                        Action::PageDownRequests.execute(&mut state);
+                    }
+                }
+                (KeyCode::Char('b'), KeyModifiers::CONTROL) => {
+                    // Page up when in Requests panel
+                    if state.focused_panel == Panel::Requests {
+                        Action::PageUpRequests.execute(&mut state);
+                    }
+                }
+                (KeyCode::Char('/'), KeyModifiers::NONE) => {
+                    // Enter search mode when in Requests panel and not already in search mode
+                    if state.focused_panel == Panel::Requests && !state.request_search_mode {
+                        Action::EnterRequestSearch.execute(&mut state);
+                    }
                 }
                 (KeyCode::Char('p'), KeyModifiers::NONE) => {
                     // Toggle protocol type
@@ -1612,6 +1635,52 @@ fn handle_collection_edit_mode(state: &mut AppState, key: KeyEvent, storage: &st
         }
         (KeyCode::End, _) => {
             state.collection_name_cursor = state.collection_name_input.len();
+        }
+        _ => {}
+    }
+}
+
+fn handle_request_search_mode(state: &mut AppState, key: KeyEvent) {
+    match key.code {
+        KeyCode::Enter => {
+            // Apply filter and exit search mode (keep filter active)
+            state.update_request_filter();
+
+            // If there are filtered results, select the first one
+            if !state.filtered_request_indices.is_empty() {
+                state.selected_request = Some(state.filtered_request_indices[0]);
+                state.clear_input_buffers();
+            }
+
+            state.request_search_mode = false;
+        }
+        KeyCode::Esc => {
+            // Cancel search without applying filter
+            Action::ExitRequestSearch.execute(state);
+        }
+        KeyCode::Backspace => {
+            if state.request_search_cursor > 0 {
+                state.request_search_input.remove(state.request_search_cursor - 1);
+                state.request_search_cursor -= 1;
+                // Update filter in real-time as user types
+                state.update_request_filter();
+            }
+        }
+        KeyCode::Left => {
+            if state.request_search_cursor > 0 {
+                state.request_search_cursor -= 1;
+            }
+        }
+        KeyCode::Right => {
+            if state.request_search_cursor < state.request_search_input.len() {
+                state.request_search_cursor += 1;
+            }
+        }
+        KeyCode::Char(c) => {
+            state.request_search_input.insert(state.request_search_cursor, c);
+            state.request_search_cursor += 1;
+            // Update filter in real-time
+            state.update_request_filter();
         }
         _ => {}
     }

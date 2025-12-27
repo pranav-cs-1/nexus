@@ -3,7 +3,7 @@ use crate::ui::theme::Theme;
 use ratatui::{
     layout::Rect,
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Widget},
+    widgets::{Block, BorderType, Borders, List, ListItem, Widget},
 };
 
 pub struct CollectionList<'a> {
@@ -31,7 +31,8 @@ impl<'a> Widget for CollectionList<'a> {
         let block = Block::default()
             .title(title)
             .borders(Borders::ALL)
-            .border_style(border_style);
+            .border_style(border_style)
+            .border_type(BorderType::Rounded);
         
         let items: Vec<ListItem> = self
             .state

@@ -28,6 +28,12 @@ pub enum Action {
     ExportGrpcRequestGrpcurl,
     OpenImportMenu,
     ImportPostmanCollection,
+    FirstRequest,
+    LastRequest,
+    PageUpRequests,
+    PageDownRequests,
+    EnterRequestSearch,
+    ExitRequestSearch,
 }
 
 impl Action {
@@ -258,6 +264,100 @@ impl Action {
                         state.import_result_message = Some(format!("Error: {}", e));
                     }
                 }
+            }
+            Action::FirstRequest => {
+                // Jump to first request in current collection
+                let collection_id = state.selected_collection
+                    .and_then(|idx| state.collections.get(idx))
+                    .map(|c| c.id);
+
+                match state.protocol_type {
+                    crate::app::state::ProtocolType::Http => {
+                        if let Some(first_idx) = state.requests.iter().position(|r| {
+                            match (collection_id, r.collection_id) {
+                                (Some(selected_id), Some(request_id)) => selected_id == request_id,
+                                (None, None) => true,
+                                _ => false,
+                            }
+                        }) {
+                            state.selected_request = Some(first_idx);
+                            state.clear_input_buffers();
+                            state.reset_request_list_scroll();
+                        }
+                    }
+                    crate::app::state::ProtocolType::Grpc => {
+                        if let Some(first_idx) = state.grpc_requests.iter().position(|r| {
+                            match (collection_id, r.collection_id) {
+                                (Some(selected_id), Some(request_id)) => selected_id == request_id,
+                                (None, None) => true,
+                                _ => false,
+                            }
+                        }) {
+                            state.selected_request = Some(first_idx);
+                            state.clear_input_buffers();
+                            state.reset_request_list_scroll();
+                        }
+                    }
+                }
+            }
+            Action::LastRequest => {
+                // Jump to last request in current collection
+                let collection_id = state.selected_collection
+                    .and_then(|idx| state.collections.get(idx))
+                    .map(|c| c.id);
+
+                match state.protocol_type {
+                    crate::app::state::ProtocolType::Http => {
+                        let last_idx = state.requests.iter().enumerate()
+                            .filter(|(_, r)| match (collection_id, r.collection_id) {
+                                (Some(selected_id), Some(request_id)) => selected_id == request_id,
+                                (None, None) => true,
+                                _ => false,
+                            })
+                            .last()
+                            .map(|(idx, _)| idx);
+
+                        if let Some(idx) = last_idx {
+                            state.selected_request = Some(idx);
+                            state.clear_input_buffers();
+                        }
+                    }
+                    crate::app::state::ProtocolType::Grpc => {
+                        let last_idx = state.grpc_requests.iter().enumerate()
+                            .filter(|(_, r)| match (collection_id, r.collection_id) {
+                                (Some(selected_id), Some(request_id)) => selected_id == request_id,
+                                (None, None) => true,
+                                _ => false,
+                            })
+                            .last()
+                            .map(|(idx, _)| idx);
+
+                        if let Some(idx) = last_idx {
+                            state.selected_request = Some(idx);
+                            state.clear_input_buffers();
+                        }
+                    }
+                }
+            }
+            Action::PageUpRequests => {
+                // Move up by 10 items
+                const PAGE_SIZE: usize = 10;
+                for _ in 0..PAGE_SIZE {
+                    state.prev_request();
+                }
+            }
+            Action::PageDownRequests => {
+                // Move down by 10 items
+                const PAGE_SIZE: usize = 10;
+                for _ in 0..PAGE_SIZE {
+                    state.next_request();
+                }
+            }
+            Action::EnterRequestSearch => {
+                state.enter_request_search_mode();
+            }
+            Action::ExitRequestSearch => {
+                state.exit_request_search_mode();
             }
         }
     }

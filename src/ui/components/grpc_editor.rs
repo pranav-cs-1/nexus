@@ -3,7 +3,7 @@ use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Widget, Wrap},
+    widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Widget, Wrap},
     style::Style,
 };
 
@@ -43,7 +43,8 @@ impl<'a> Widget for GrpcEditor<'a> {
         let block = Block::default()
             .title(title)
             .borders(Borders::ALL)
-            .border_style(border_style);
+            .border_style(border_style)
+            .border_type(BorderType::Rounded);
 
         let inner_area = block.inner(area);
         block.render(area, buf);
@@ -90,7 +91,8 @@ impl<'a> GrpcEditor<'a> {
         let block = Block::default()
             .title(title)
             .borders(Borders::ALL)
-            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
+            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() })
+            .border_type(BorderType::Rounded);
 
         let text = if is_editing {
             let display_text = edit_content;
@@ -221,7 +223,8 @@ impl<'a> GrpcEditor<'a> {
         let block = Block::default()
             .title("Message (JSON)")
             .borders(Borders::ALL)
-            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
+            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() })
+            .border_type(BorderType::Rounded);
 
         let mut display_text = if is_editing {
             self.state.grpc_message_input.clone()
@@ -262,7 +265,8 @@ impl<'a> GrpcEditor<'a> {
         let block = Block::default()
             .title(title)
             .borders(Borders::ALL)
-            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() });
+            .border_style(if is_focused { Theme::selected() } else { Theme::unfocused_border() })
+            .border_type(BorderType::Rounded);
 
         if is_editing {
             let items: Vec<ListItem> = self.state.grpc_metadata_input

@@ -137,6 +137,15 @@ pub struct AppState {
     // Response viewer scroll state
     pub response_scroll: u16,
 
+    // Request list scroll state
+    pub request_list_scroll: u16,
+
+    // Search/filter state
+    pub request_search_mode: bool,
+    pub request_search_input: String,
+    pub request_search_cursor: usize,
+    pub filtered_request_indices: Vec<usize>,
+
     // gRPC support
     #[allow(dead_code)]
     pub protocol_type: ProtocolType,
@@ -220,8 +229,17 @@ impl AppState {
             body_cursor: 0,
             auth_input: String::new(),
             auth_cursor: 0,
-            
+
             response_scroll: 0,
+
+            // Request list scroll state
+            request_list_scroll: 0,
+
+            // Search/filter state
+            request_search_mode: false,
+            request_search_input: String::new(),
+            request_search_cursor: 0,
+            filtered_request_indices: Vec::new(),
 
             // gRPC support
             protocol_type: ProtocolType::Http,
@@ -719,6 +737,128 @@ impl AppState {
     
     pub fn reset_response_scroll(&mut self) {
         self.response_scroll = 0;
+    }
+
+    // Request list scroll helpers
+    pub fn scroll_request_list_to(&mut self, position: u16) {
+        self.request_list_scroll = position;
+    }
+
+    pub fn reset_request_list_scroll(&mut self) {
+        self.request_list_scroll = 0;
+    }
+
+    // Search/filter helpers
+    pub fn enter_request_search_mode(&mut self) {
+        self.request_search_mode = true;
+        self.request_search_input.clear();
+        self.request_search_cursor = 0;
+        self.filtered_request_indices.clear();
+    }
+
+    pub fn exit_request_search_mode(&mut self) {
+        self.request_search_mode = false;
+        self.request_search_input.clear();
+        self.request_search_cursor = 0;
+        self.filtered_request_indices.clear();
+    }
+
+    pub fn update_request_filter(&mut self) {
+        self.filtered_request_indices.clear();
+
+        if self.request_search_input.is_empty() {
+            return; // No filter, show all
+        }
+
+        let search_lower = self.request_search_input.to_lowercase();
+        let selected_collection_id = self.selected_collection
+            .and_then(|idx| self.collections.get(idx))
+            .map(|c| c.id);
+
+        match self.protocol_type {
+            ProtocolType::Http => {
+                for (idx, request) in self.requests.iter().enumerate() {
+                    // Check if request belongs to current collection
+                    let in_collection = match (selected_collection_id, request.collection_id) {
+                        (Some(selected_id), Some(request_id)) => selected_id == request_id,
+                        (None, None) => true,
+                        _ => false,
+                    };
+
+                    if in_collection && (
+                        request.name.to_lowercase().contains(&search_lower) ||
+                        request.url.to_lowercase().contains(&search_lower) ||
+                        request.method.as_str().to_lowercase().contains(&search_lower)
+                    ) {
+                        self.filtered_request_indices.push(idx);
+                    }
+                }
+            }
+            ProtocolType::Grpc => {
+                for (idx, request) in self.grpc_requests.iter().enumerate() {
+                    let in_collection = match (selected_collection_id, request.collection_id) {
+                        (Some(selected_id), Some(request_id)) => selected_id == request_id,
+                        (None, None) => true,
+                        _ => false,
+                    };
+
+                    if in_collection && (
+                        request.name.to_lowercase().contains(&search_lower) ||
+                        request.server_url.to_lowercase().contains(&search_lower) ||
+                        request.service_name.to_lowercase().contains(&search_lower) ||
+                        request.method_name.to_lowercase().contains(&search_lower)
+                    ) {
+                        self.filtered_request_indices.push(idx);
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn get_request_list_position(&self) -> Option<(usize, usize)> {
+        // Returns (current_position_1_indexed, total_count)
+        if let Some(selected_idx) = self.selected_request {
+            let selected_collection_id = self.selected_collection
+                .and_then(|idx| self.collections.get(idx))
+                .map(|c| c.id);
+
+            let (visible_indices, total) = if self.request_search_mode && !self.request_search_input.is_empty() {
+                // Use filtered indices
+                (self.filtered_request_indices.clone(), self.filtered_request_indices.len())
+            } else {
+                // Build list of all visible indices (matching collection filter)
+                let indices: Vec<usize> = match self.protocol_type {
+                    ProtocolType::Http => {
+                        self.requests.iter().enumerate()
+                            .filter(|(_, r)| match (selected_collection_id, r.collection_id) {
+                                (Some(selected_id), Some(request_id)) => selected_id == request_id,
+                                (None, None) => true,
+                                _ => false,
+                            })
+                            .map(|(idx, _)| idx)
+                            .collect()
+                    }
+                    ProtocolType::Grpc => {
+                        self.grpc_requests.iter().enumerate()
+                            .filter(|(_, r)| match (selected_collection_id, r.collection_id) {
+                                (Some(selected_id), Some(request_id)) => selected_id == request_id,
+                                (None, None) => true,
+                                _ => false,
+                            })
+                            .map(|(idx, _)| idx)
+                            .collect()
+                    }
+                };
+                let count = indices.len();
+                (indices, count)
+            };
+
+            if let Some(pos) = visible_indices.iter().position(|&idx| idx == selected_idx) {
+                return Some((pos + 1, total)); // 1-indexed for display
+            }
+        }
+
+        None
     }
 
     // gRPC request helpers
