@@ -60,7 +60,6 @@ impl<'a> ExportPopup<'a> {
     
     fn render_collection_selection(&self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
         let title = match self.state.export_mode {
-            Some(ExportMode::CollectionJson) => "Export Collection as JSON",
             Some(ExportMode::RequestCurl) => "Export Request as curl - Select Collection",
             Some(ExportMode::GrpcRequestGrpcurl) => "Export gRPC Request as grpcurl - Select Collection",
             None => "Export",

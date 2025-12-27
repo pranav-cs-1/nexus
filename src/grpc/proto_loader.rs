@@ -48,28 +48,6 @@ impl ProtoLoader {
         Ok(schema)
     }
 
-    /// Load from raw descriptor bytes
-    pub fn load_from_bytes(&self, name: String, bytes: Vec<u8>, source_type: ProtoSourceType) -> Result<ProtoSchema> {
-        // Parse the descriptor
-        let pool = DescriptorPool::decode(&bytes[..])
-            .context("Failed to parse descriptor bytes")?;
-
-        // Extract service and method information
-        let services = self.extract_services(&pool)?;
-
-        let mut schema = ProtoSchema::new(name, bytes, source_type);
-        schema.services = services;
-
-        Ok(schema)
-    }
-
-    /// Parse proto descriptor bytes and return the pool
-    pub fn parse_descriptor(&self, bytes: &[u8]) -> Result<DescriptorPool> {
-        let pool = DescriptorPool::decode(bytes)
-            .context("Failed to parse descriptor")?;
-        Ok(pool)
-    }
-
     /// Extract all services and methods from a descriptor pool
     fn extract_services(&self, pool: &DescriptorPool) -> Result<Vec<ServiceInfo>> {
         let mut services = Vec::new();
@@ -113,49 +91,6 @@ impl ProtoLoader {
             name: service.full_name().to_string(),
             methods,
         })
-    }
-
-    /// Generate a JSON template for a message type
-    pub fn generate_message_template(&self, pool: &DescriptorPool, message_type: &str) -> Result<String> {
-        let message = pool.get_message_by_name(message_type)
-            .ok_or_else(|| anyhow!("Message type '{}' not found in proto schema", message_type))?;
-
-        let mut fields = Vec::new();
-
-        for field in message.fields() {
-            let field_name = field.name();
-            let default_value = match field.kind() {
-                prost_reflect::Kind::Double | prost_reflect::Kind::Float => "0.0",
-                prost_reflect::Kind::Int32 | prost_reflect::Kind::Int64 |
-                prost_reflect::Kind::Uint32 | prost_reflect::Kind::Uint64 |
-                prost_reflect::Kind::Sint32 | prost_reflect::Kind::Sint64 |
-                prost_reflect::Kind::Fixed32 | prost_reflect::Kind::Fixed64 |
-                prost_reflect::Kind::Sfixed32 | prost_reflect::Kind::Sfixed64 => "0",
-                prost_reflect::Kind::Bool => "false",
-                prost_reflect::Kind::String => "\"\"",
-                prost_reflect::Kind::Bytes => "\"\"",
-                prost_reflect::Kind::Message(_) => "{}",
-                prost_reflect::Kind::Enum(_) => "0",
-            };
-
-            fields.push(format!("  \"{}\": {}", field_name, default_value));
-        }
-
-        Ok(format!("{{\n{}\n}}", fields.join(",\n")))
-    }
-
-    /// Get all available services from a schema
-    pub fn list_services(&self, schema: &ProtoSchema) -> Vec<String> {
-        schema.services.iter().map(|s| s.name.clone()).collect()
-    }
-
-    /// Get all methods for a specific service
-    pub fn list_methods(&self, schema: &ProtoSchema, service_name: &str) -> Vec<String> {
-        schema.services
-            .iter()
-            .find(|s| s.name == service_name)
-            .map(|s| s.methods.iter().map(|m| m.name.clone()).collect())
-            .unwrap_or_default()
     }
 
     /// Get method information

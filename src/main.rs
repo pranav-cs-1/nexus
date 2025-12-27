@@ -1102,9 +1102,6 @@ fn handle_export_menu(state: &mut AppState, key: KeyEvent) {
                 }
                 KeyCode::Enter => {
                     match state.export_mode {
-                        Some(ExportMode::CollectionJson) => {
-                            Action::ExportCollectionJson.execute(state);
-                        }
                         Some(ExportMode::RequestCurl) => {
                             // Move to request selection stage
                             if let Some(collection_idx) = state.export_selected_collection {
@@ -2166,7 +2163,6 @@ fn handle_proto_input(state: &mut AppState, key: KeyEvent, storage: &storage::St
             let proto_loader = grpc::proto_loader::ProtoLoader::new();
             match proto_loader.load_descriptor_file(&expanded_path) {
                 Ok(schema) => {
-                    let service_count = schema.services.len();
                     let schema_name = schema.name.clone();
 
                     // Check if this file is already loaded (by source_path)

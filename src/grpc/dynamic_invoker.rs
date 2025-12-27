@@ -1,8 +1,61 @@
 use anyhow::{Result, Context, anyhow};
-use prost_reflect::{DynamicMessage, DescriptorPool, MessageDescriptor, MethodDescriptor};
+use prost_reflect::{DynamicMessage, DescriptorPool, MethodDescriptor};
 use prost::Message;
 use tonic::transport::Channel;
+use tonic::codec::{Codec, DecodeBuf, Decoder, EncodeBuf, Encoder};
+use prost::bytes::{Buf, BufMut};
 use std::collections::HashMap;
+
+/// A simple codec that passes bytes through without encoding/decoding
+#[derive(Debug, Clone, Default)]
+struct BytesCodec;
+
+impl Codec for BytesCodec {
+    type Encode = Vec<u8>;
+    type Decode = Vec<u8>;
+    type Encoder = BytesEncoder;
+    type Decoder = BytesDecoder;
+
+    fn encoder(&mut self) -> Self::Encoder {
+        BytesEncoder
+    }
+
+    fn decoder(&mut self) -> Self::Decoder {
+        BytesDecoder
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct BytesEncoder;
+
+impl Encoder for BytesEncoder {
+    type Item = Vec<u8>;
+    type Error = tonic::Status;
+
+    fn encode(&mut self, item: Self::Item, dst: &mut EncodeBuf<'_>) -> Result<(), Self::Error> {
+        dst.put_slice(&item);
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct BytesDecoder;
+
+impl Decoder for BytesDecoder {
+    type Item = Vec<u8>;
+    type Error = tonic::Status;
+
+    fn decode(&mut self, src: &mut DecodeBuf<'_>) -> Result<Option<Self::Item>, Self::Error> {
+        let chunk = src.chunk();
+        if chunk.is_empty() {
+            return Ok(None);
+        }
+        let len = chunk.len();
+        let mut buf = vec![0u8; len];
+        src.copy_to_slice(&mut buf);
+        Ok(Some(buf))
+    }
+}
 
 /// Handles dynamic invocation of gRPC methods without compile-time generated code
 pub struct DynamicInvoker {
@@ -58,8 +111,8 @@ impl DynamicInvoker {
         // Create a tonic client with the channel
         let mut client = tonic::client::Grpc::new(self.channel.clone());
 
-        // Create a codec for raw bytes
-        let codec = tonic::codec::ProstCodec::default();
+        // Create a codec for raw bytes (pass-through without additional encoding)
+        let codec = BytesCodec::default();
 
         // Prepare the request
         let mut request = tonic::Request::new(request_bytes);
@@ -74,7 +127,6 @@ impl DynamicInvoker {
         }
 
         // Ensure the client is ready before making the call
-        use tower::ServiceExt;
         client.ready().await.context("Client not ready")?;
 
         // Make the unary call
@@ -87,7 +139,7 @@ impl DynamicInvoker {
         let response_bytes: Vec<u8> = response.into_inner();
 
         // Decode the response
-        let response_msg = DynamicMessage::decode(output_desc, &response_bytes[..])
+        let response_msg = DynamicMessage::decode(output_desc.clone(), &response_bytes[..])
             .context("Failed to decode response message")?;
 
         Ok(response_msg)
@@ -127,19 +179,6 @@ impl DynamicInvoker {
             service_name,
             available_services.join(", ")
         ))
-    }
-
-    /// Create a message template (JSON) for a given message type
-    pub fn create_message_template(&self, message_desc: &MessageDescriptor) -> String {
-        let msg = DynamicMessage::new(message_desc.clone());
-
-        // Serialize to JSON using serde (with serde feature enabled)
-        serde_json::to_string_pretty(&msg).unwrap_or_else(|_| "{}".to_string())
-    }
-
-    /// Get the descriptor pool reference
-    pub fn descriptor(&self) -> &DescriptorPool {
-        &self.descriptor
     }
 }
 

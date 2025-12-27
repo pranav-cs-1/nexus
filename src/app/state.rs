@@ -9,7 +9,6 @@ use crate::models::{
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ExportMode {
-    CollectionJson,
     RequestCurl,
     GrpcRequestGrpcurl,
 }

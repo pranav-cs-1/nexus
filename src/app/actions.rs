@@ -3,7 +3,6 @@ use crate::import::import_postman_collection;
 use crate::models::collection::Collection;
 use crate::models::request::HttpRequest;
 use crate::models::GrpcRequest;
-use uuid::Uuid;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -19,16 +18,12 @@ pub enum Action {
     NextEditorTab,
     NewRequest,
     NewGrpcRequest,
-    DeleteRequest,
-    DuplicateRequest,
     NewCollection,
     DeleteCollection,
     EditCollection,
     CopyResponse,
-    OpenExportMenu,
     OpenCurlExportMenu,
     OpenGrpcurlExportMenu,
-    ExportCollectionJson,
     ExportRequestCurl,
     ExportGrpcRequestGrpcurl,
     OpenImportMenu,
@@ -67,31 +62,6 @@ impl Action {
                 state.grpc_requests.push(request);
                 state.selected_request = Some(state.grpc_requests.len() - 1);
             }
-            Action::DeleteRequest => {
-                if let Some(idx) = state.selected_request {
-                    state.requests.remove(idx);
-                    if state.requests.is_empty() {
-                        state.selected_request = None;
-                    } else if idx >= state.requests.len() {
-                        state.selected_request = Some(state.requests.len() - 1);
-                    }
-                    state.clear_input_buffers();
-                }
-            }
-            Action::DuplicateRequest => {
-                if let Some(request) = state.get_current_request() {
-                    let mut new_request = request.clone();
-                    new_request.id = Uuid::new_v4();
-                    new_request.name = format!("{} (copy)", new_request.name);
-                    if let Some(collection_idx) = state.selected_collection {
-                        if let Some(collection) = state.collections.get(collection_idx) {
-                            new_request.collection_id = Some(collection.id);
-                        }
-                    }
-                    state.requests.push(new_request);
-                    state.selected_request = Some(state.requests.len() - 1);
-                }
-            }
             Action::NewCollection => {
                 let collection_num = state.collections.len() + 1;
                 let collection = Collection::new(format!("Collection {}", collection_num));
@@ -120,14 +90,6 @@ impl Action {
                     }
                 }
             }
-            Action::OpenExportMenu => {
-                state.show_export_menu = true;
-                state.export_mode = Some(ExportMode::CollectionJson);
-                state.export_menu_stage = ExportMenuStage::SelectingCollection;
-                state.export_selected_collection = if !state.collections.is_empty() { Some(0) } else { None };
-                state.export_selected_request = None;
-                state.export_result_message = None;
-            }
             Action::OpenCurlExportMenu => {
                 state.show_export_menu = true;
                 state.export_mode = Some(ExportMode::RequestCurl);
@@ -143,44 +105,6 @@ impl Action {
                 state.export_selected_collection = if !state.collections.is_empty() { Some(0) } else { None };
                 state.export_selected_request = None;
                 state.export_result_message = None;
-            }
-            Action::ExportCollectionJson => {
-                if let Some(collection_idx) = state.export_selected_collection {
-                    if let Some(collection) = state.collections.get(collection_idx) {
-                        // Get all requests for this collection
-                        let collection_requests: Vec<_> = state.requests
-                            .iter()
-                            .filter(|r| r.collection_id == Some(collection.id))
-                            .cloned()
-                            .collect();
-                        
-                        if let Ok(json) = collection.to_json(&collection_requests) {
-                            // Create exports directory if it doesn't exist
-                            let exports_dir = PathBuf::from("exports");
-                            let _ = fs::create_dir_all(&exports_dir);
-                            
-                            // Generate filename based on collection name
-                            let safe_name = collection.name
-                                .chars()
-                                .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
-                                .collect::<String>();
-                            let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
-                            let filename = format!("{}_{}.json", safe_name, timestamp);
-                            let filepath = exports_dir.join(&filename);
-                            
-                            match fs::write(&filepath, json) {
-                                Ok(_) => {
-                                    state.export_result_message = Some(filepath.to_string_lossy().to_string());
-                                    state.export_menu_stage = ExportMenuStage::ShowingResult;
-                                }
-                                Err(_) => {
-                                    state.export_result_message = Some("Failed to save export".to_string());
-                                    state.export_menu_stage = ExportMenuStage::ShowingResult;
-                                }
-                            }
-                        }
-                    }
-                }
             }
             Action::ExportRequestCurl => {
                 if let Some(request_idx) = state.export_selected_request {

@@ -21,13 +21,6 @@ impl<'a> RequestItem<'a> {
             RequestItem::Grpc(req) => req.id,
         }
     }
-
-    fn collection_id(&self) -> Option<Uuid> {
-        match self {
-            RequestItem::Http(req) => req.collection_id,
-            RequestItem::Grpc(req) => req.collection_id,
-        }
-    }
 }
 
 pub struct RequestList<'a> {
