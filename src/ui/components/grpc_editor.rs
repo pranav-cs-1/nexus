@@ -28,10 +28,16 @@ impl<'a> Widget for GrpcEditor<'a> {
             Theme::unfocused_border()
         };
 
-        let title = if is_editing {
-            "gRPC Request Editor [EDITING - ESC to save, Tab/Shift+Tab to switch fields]"
+        let proto_indicator = if let Some(schema) = self.state.get_selected_proto_schema() {
+            format!(" | Proto: {}", schema.name)
         } else {
-            "gRPC Request Editor [Press 'e' to edit]"
+            " | No proto loaded (Press 'l')".to_string()
+        };
+
+        let title = if is_editing {
+            format!("gRPC Request Editor [EDITING - ESC to save, Tab/Shift+Tab to switch fields]{}", proto_indicator)
+        } else {
+            format!("gRPC Request Editor [Press 'e' to edit]{}", proto_indicator)
         };
 
         let block = Block::default()

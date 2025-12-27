@@ -61,8 +61,13 @@ impl<'a> Widget for RequestList<'a> {
             Theme::unfocused_border()
         };
 
+        let protocol_indicator = match self.state.protocol_type {
+            ProtocolType::Http => "HTTP Requests",
+            ProtocolType::Grpc => "gRPC Requests",
+        };
+
         let block = Block::default()
-            .title("Requests")
+            .title(protocol_indicator)
             .borders(Borders::ALL)
             .border_style(border_style);
 

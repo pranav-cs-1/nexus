@@ -12,6 +12,6 @@ pub mod protocol;
 
 // Re-exports for convenience
 pub use grpc_request::GrpcRequest;
-pub use grpc_response::{GrpcResponse, GrpcStatus};
+pub use grpc_response::{GrpcResponse, GrpcStatus, GrpcMessage};
 pub use proto_schema::ProtoSchema;
 

@@ -49,7 +49,12 @@ async fn main() -> anyhow::Result<()> {
     state.requests = storage.load_requests()?;
     state.grpc_requests = storage.load_grpc_requests()?;
     state.proto_schemas = storage.load_proto_schemas()?;
-    
+
+    // Auto-select the most recent proto schema if any exist
+    if !state.proto_schemas.is_empty() {
+        state.selected_proto_schema = Some(state.proto_schemas.len() - 1);
+    }
+
     // If no data exists, create sample data
     if state.collections.is_empty() {
         let default_collection = models::collection::Collection::new("Example Collection".to_string());
@@ -229,6 +234,11 @@ async fn main() -> anyhow::Result<()> {
                 continue;
             }
 
+            if state.show_proto_loader {
+                handle_proto_loader(&mut state, key, &storage);
+                continue;
+            }
+
             if state.show_help {
                 match key.code {
                     KeyCode::Char('?') | KeyCode::Esc => {
@@ -321,10 +331,11 @@ async fn main() -> anyhow::Result<()> {
                                     state.grpc_response = None;
 
                                     let tx = grpc_response_tx.clone();
+                                    let proto_schema = state.get_selected_proto_schema().cloned();
 
                                     tokio::spawn(async move {
                                         let grpc_client = grpc::client::GrpcClient::new();
-                                        let result = match grpc_client.execute_unary(&request).await {
+                                        let result = match grpc_client.execute_unary(&request, proto_schema.as_ref()).await {
                                             Ok(response) => GrpcResult::Success(response),
                                             Err(e) => GrpcResult::Error(e.to_string()),
                                         };
@@ -342,20 +353,30 @@ async fn main() -> anyhow::Result<()> {
                             if let Some(request) = state.requests.last() {
                                 let _ = storage.save_request(request);
                             }
+                            state.current_response = None;
+                            state.reset_response_scroll();
                         }
                         ProtocolType::Grpc => {
                             Action::NewGrpcRequest.execute(&mut state);
                             if let Some(request) = state.grpc_requests.last() {
                                 let _ = storage.save_grpc_request(request);
                             }
+                            state.grpc_response = None;
+                            state.reset_response_scroll();
                         }
                     }
                 }
                 (KeyCode::Char('g'), KeyModifiers::NONE) => {
+                    // Create new gRPC request and switch to gRPC mode
+                    state.protocol_type = ProtocolType::Grpc;
                     Action::NewGrpcRequest.execute(&mut state);
                     if let Some(request) = state.grpc_requests.last() {
                         let _ = storage.save_grpc_request(request);
                     }
+                    state.current_response = None;
+                    state.grpc_response = None;
+                    state.clear_input_buffers();
+                    state.reset_response_scroll();
                 }
                 (KeyCode::Char('p'), KeyModifiers::NONE) => {
                     // Toggle protocol type
@@ -363,14 +384,15 @@ async fn main() -> anyhow::Result<()> {
                         ProtocolType::Http => ProtocolType::Grpc,
                         ProtocolType::Grpc => ProtocolType::Http,
                     };
-                    // Reset selection when switching protocols
-                    state.selected_request = if state.protocol_type == ProtocolType::Http && !state.requests.is_empty() {
-                        Some(0)
-                    } else if state.protocol_type == ProtocolType::Grpc && !state.grpc_requests.is_empty() {
-                        Some(0)
-                    } else {
-                        None
-                    };
+
+                    // Clear responses and input buffers when switching protocols
+                    state.current_response = None;
+                    state.grpc_response = None;
+                    state.clear_input_buffers();
+                    state.reset_response_scroll();
+
+                    // Reset selection when switching protocols, respecting collection filter
+                    state.update_selected_request_for_collection();
                 }
                 (KeyCode::Char('d'), KeyModifiers::NONE) => {
                     if let Some(idx) = state.selected_request {
@@ -379,26 +401,30 @@ async fn main() -> anyhow::Result<()> {
                                 if let Some(request) = state.requests.get(idx) {
                                     let request_id = request.id;
                                     state.requests.remove(idx);
-                                    if state.requests.is_empty() {
-                                        state.selected_request = None;
-                                    } else if idx >= state.requests.len() {
-                                        state.selected_request = Some(state.requests.len() - 1);
-                                    }
-                                    state.clear_input_buffers();
                                     let _ = storage.delete_request(&request_id);
+
+                                    // Clear response and input buffers
+                                    state.current_response = None;
+                                    state.clear_input_buffers();
+                                    state.reset_response_scroll();
+
+                                    // Update selection to next valid request in collection
+                                    state.update_selected_request_for_collection();
                                 }
                             }
                             ProtocolType::Grpc => {
                                 if let Some(request) = state.grpc_requests.get(idx) {
                                     let request_id = request.id;
                                     state.grpc_requests.remove(idx);
-                                    if state.grpc_requests.is_empty() {
-                                        state.selected_request = None;
-                                    } else if idx >= state.grpc_requests.len() {
-                                        state.selected_request = Some(state.grpc_requests.len() - 1);
-                                    }
-                                    state.clear_input_buffers();
                                     let _ = storage.delete_grpc_request(&request_id);
+
+                                    // Clear response and input buffers
+                                    state.grpc_response = None;
+                                    state.clear_input_buffers();
+                                    state.reset_response_scroll();
+
+                                    // Update selection to next valid request in collection
+                                    state.update_selected_request_for_collection();
                                 }
                             }
                         }
@@ -419,6 +445,10 @@ async fn main() -> anyhow::Result<()> {
                                 state.requests.push(new_request.clone());
                                 state.selected_request = Some(state.requests.len() - 1);
                                 let _ = storage.save_request(&new_request);
+                                // Clear response and input buffers for the new request
+                                state.current_response = None;
+                                state.clear_input_buffers();
+                                state.reset_response_scroll();
                             }
                         }
                         ProtocolType::Grpc => {
@@ -434,6 +464,10 @@ async fn main() -> anyhow::Result<()> {
                                 state.grpc_requests.push(new_request.clone());
                                 state.selected_request = Some(state.grpc_requests.len() - 1);
                                 let _ = storage.save_grpc_request(&new_request);
+                                // Clear response and input buffers for the new request
+                                state.grpc_response = None;
+                                state.clear_input_buffers();
+                                state.reset_response_scroll();
                             }
                         }
                     }
@@ -473,21 +507,52 @@ async fn main() -> anyhow::Result<()> {
                         if let Some(idx) = state.selected_collection {
                             if let Some(collection) = state.collections.get(idx) {
                                 let collection_id = collection.id;
-                                Action::DeleteCollection.execute(&mut state);
+
+                                // Remove all HTTP requests belonging to this collection
+                                state.requests.retain(|r| r.collection_id != Some(collection_id));
+
+                                // Remove all gRPC requests belonging to this collection
+                                state.grpc_requests.retain(|r| r.collection_id != Some(collection_id));
+
+                                // Delete from storage
                                 let _ = storage.delete_collection(&collection_id);
                                 let _ = storage.delete_requests_by_collection(&collection_id);
+                                let _ = storage.delete_grpc_requests_by_collection(&collection_id);
+
+                                // Delete the collection from state
+                                Action::DeleteCollection.execute(&mut state);
+
+                                // Clear responses and input buffers
+                                state.current_response = None;
+                                state.grpc_response = None;
+                                state.clear_input_buffers();
+                                state.reset_response_scroll();
+
+                                // Update selection
+                                state.update_selected_request_for_collection();
                             }
                         }
                     }
                 }
                 (KeyCode::Char('o'), KeyModifiers::NONE) => {
-                    Action::OpenExportMenu.execute(&mut state);
-                }
-                (KeyCode::Char('s'), KeyModifiers::NONE) => {
-                    Action::OpenCurlExportMenu.execute(&mut state);
+                    // Open export menu based on current protocol
+                    match state.protocol_type {
+                        ProtocolType::Http => {
+                            Action::OpenCurlExportMenu.execute(&mut state);
+                        }
+                        ProtocolType::Grpc => {
+                            Action::OpenGrpcurlExportMenu.execute(&mut state);
+                        }
+                    }
                 }
                 (KeyCode::Char('i'), KeyModifiers::NONE) => {
                     Action::OpenImportMenu.execute(&mut state);
+                }
+                (KeyCode::Char('l'), KeyModifiers::NONE) => {
+                    // Open proto loader only in gRPC mode
+                    if state.protocol_type == ProtocolType::Grpc {
+                        state.open_proto_loader();
+                    }
                 }
                 _ => {}
             }
@@ -1044,13 +1109,29 @@ fn handle_export_menu(state: &mut AppState, key: KeyEvent) {
                             // Move to request selection stage
                             if let Some(collection_idx) = state.export_selected_collection {
                                 if let Some(collection) = state.collections.get(collection_idx) {
-                                    // Find first request in this collection
+                                    // Find first HTTP request in this collection
                                     let first_request_idx = state.requests
                                         .iter()
                                         .enumerate()
                                         .find(|(_, r)| r.collection_id == Some(collection.id))
                                         .map(|(idx, _)| idx);
-                                    
+
+                                    state.export_selected_request = first_request_idx;
+                                    state.export_menu_stage = ExportMenuStage::SelectingRequest;
+                                }
+                            }
+                        }
+                        Some(ExportMode::GrpcRequestGrpcurl) => {
+                            // Move to request selection stage for gRPC requests
+                            if let Some(collection_idx) = state.export_selected_collection {
+                                if let Some(collection) = state.collections.get(collection_idx) {
+                                    // Find first gRPC request in this collection
+                                    let first_request_idx = state.grpc_requests
+                                        .iter()
+                                        .enumerate()
+                                        .find(|(_, r)| r.collection_id == Some(collection.id))
+                                        .map(|(idx, _)| idx);
+
                                     state.export_selected_request = first_request_idx;
                                     state.export_menu_stage = ExportMenuStage::SelectingRequest;
                                 }
@@ -1073,14 +1154,27 @@ fn handle_export_menu(state: &mut AppState, key: KeyEvent) {
                     if let Some(current_idx) = state.export_selected_request {
                         if let Some(collection_idx) = state.export_selected_collection {
                             if let Some(collection) = state.collections.get(collection_idx) {
-                                // Find previous request in this collection
-                                let requests_in_collection: Vec<usize> = state.requests
-                                    .iter()
-                                    .enumerate()
-                                    .filter(|(_, r)| r.collection_id == Some(collection.id))
-                                    .map(|(idx, _)| idx)
-                                    .collect();
-                                
+                                // Find previous request in this collection based on export mode
+                                let requests_in_collection: Vec<usize> = match state.export_mode {
+                                    Some(ExportMode::RequestCurl) => {
+                                        state.requests
+                                            .iter()
+                                            .enumerate()
+                                            .filter(|(_, r)| r.collection_id == Some(collection.id))
+                                            .map(|(idx, _)| idx)
+                                            .collect()
+                                    }
+                                    Some(ExportMode::GrpcRequestGrpcurl) => {
+                                        state.grpc_requests
+                                            .iter()
+                                            .enumerate()
+                                            .filter(|(_, r)| r.collection_id == Some(collection.id))
+                                            .map(|(idx, _)| idx)
+                                            .collect()
+                                    }
+                                    _ => vec![],
+                                };
+
                                 if let Some(pos) = requests_in_collection.iter().position(|&idx| idx == current_idx) {
                                     if pos > 0 {
                                         state.export_selected_request = Some(requests_in_collection[pos - 1]);
@@ -1094,14 +1188,27 @@ fn handle_export_menu(state: &mut AppState, key: KeyEvent) {
                     if let Some(current_idx) = state.export_selected_request {
                         if let Some(collection_idx) = state.export_selected_collection {
                             if let Some(collection) = state.collections.get(collection_idx) {
-                                // Find next request in this collection
-                                let requests_in_collection: Vec<usize> = state.requests
-                                    .iter()
-                                    .enumerate()
-                                    .filter(|(_, r)| r.collection_id == Some(collection.id))
-                                    .map(|(idx, _)| idx)
-                                    .collect();
-                                
+                                // Find next request in this collection based on export mode
+                                let requests_in_collection: Vec<usize> = match state.export_mode {
+                                    Some(ExportMode::RequestCurl) => {
+                                        state.requests
+                                            .iter()
+                                            .enumerate()
+                                            .filter(|(_, r)| r.collection_id == Some(collection.id))
+                                            .map(|(idx, _)| idx)
+                                            .collect()
+                                    }
+                                    Some(ExportMode::GrpcRequestGrpcurl) => {
+                                        state.grpc_requests
+                                            .iter()
+                                            .enumerate()
+                                            .filter(|(_, r)| r.collection_id == Some(collection.id))
+                                            .map(|(idx, _)| idx)
+                                            .collect()
+                                    }
+                                    _ => vec![],
+                                };
+
                                 if let Some(pos) = requests_in_collection.iter().position(|&idx| idx == current_idx) {
                                     if pos < requests_in_collection.len() - 1 {
                                         state.export_selected_request = Some(requests_in_collection[pos + 1]);
@@ -1112,7 +1219,15 @@ fn handle_export_menu(state: &mut AppState, key: KeyEvent) {
                     }
                 }
                 KeyCode::Enter => {
-                    Action::ExportRequestCurl.execute(state);
+                    match state.export_mode {
+                        Some(ExportMode::RequestCurl) => {
+                            Action::ExportRequestCurl.execute(state);
+                        }
+                        Some(ExportMode::GrpcRequestGrpcurl) => {
+                            Action::ExportGrpcRequestGrpcurl.execute(state);
+                        }
+                        _ => {}
+                    }
                 }
                 _ => {}
             }
@@ -1309,6 +1424,122 @@ fn autocomplete_file_path(state: &mut AppState) {
 
                 state.import_file_input = full_str;
                 state.import_file_cursor = state.import_file_input.len();
+            }
+        }
+    }
+}
+
+fn autocomplete_proto_file_path(state: &mut AppState) {
+    use std::path::{Path, PathBuf};
+
+    let input = state.proto_file_input.trim();
+    if input.is_empty() {
+        return;
+    }
+
+    // Expand ~ to home directory
+    let expanded = if input.starts_with("~/") {
+        if let Some(home) = std::env::var("HOME").ok() {
+            input.replacen("~", &home, 1)
+        } else {
+            input.to_string()
+        }
+    } else {
+        input.to_string()
+    };
+
+    let path = Path::new(&expanded);
+
+    // Determine the directory to search and the prefix to match
+    let (search_dir, prefix) = if expanded.ends_with('/') || expanded.ends_with('\\') {
+        // User typed a trailing slash, search in that directory
+        (path.to_path_buf(), String::new())
+    } else if let Some(parent) = path.parent() {
+        // Search in parent directory for files matching the filename
+        let file_name = path.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+        (parent.to_path_buf(), file_name)
+    } else {
+        // No parent, search in current directory
+        (PathBuf::from("."), expanded.clone())
+    };
+
+    // Read directory and find matches
+    if let Ok(entries) = std::fs::read_dir(&search_dir) {
+        let mut matches: Vec<String> = entries
+            .filter_map(|entry| entry.ok())
+            .filter_map(|entry| {
+                let file_name = entry.file_name().to_string_lossy().to_string();
+                // For proto files, prioritize .proto and .pb files
+                let is_proto_related = file_name.ends_with(".proto")
+                    || file_name.ends_with(".pb")
+                    || entry.path().is_dir();
+
+                if file_name.starts_with(&prefix) && !file_name.starts_with('.') && is_proto_related {
+                    Some(file_name)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        matches.sort();
+
+        if matches.is_empty() {
+            return;
+        }
+
+        if matches.len() == 1 {
+            // Single match - complete it
+            let mut full_path = search_dir.join(&matches[0]);
+
+            // Add trailing slash for directories
+            if full_path.is_dir() {
+                full_path.push("");
+            }
+
+            // Convert back to string, preserve the original prefix
+            let mut full_str = full_path.to_string_lossy().to_string();
+
+            // Preserve ~ if it was used
+            if input.starts_with("~/") {
+                if let Some(home) = std::env::var("HOME").ok() {
+                    full_str = full_str.replace(&home, "~");
+                }
+            }
+            // Preserve ./ if it was used and we're in current directory
+            else if input.starts_with("./") && search_dir == Path::new(".") {
+                if !full_str.starts_with("./") {
+                    full_str = format!("./{}", full_str);
+                }
+            }
+
+            state.proto_file_input = full_str;
+            state.proto_file_cursor = state.proto_file_input.len();
+        } else {
+            // Multiple matches - complete to common prefix
+            let common_prefix = find_common_prefix(&matches);
+            if common_prefix.len() > prefix.len() {
+                let full_path = search_dir.join(&common_prefix);
+                let mut full_str = full_path.to_string_lossy().to_string();
+
+                // Preserve ~ if it was used
+                if input.starts_with("~/") {
+                    if let Some(home) = std::env::var("HOME").ok() {
+                        full_str = full_str.replace(&home, "~");
+                    }
+                }
+                // Preserve ./ if it was used and we're in current directory
+                else if input.starts_with("./") && search_dir == Path::new(".") {
+                    if !full_str.starts_with("./") {
+                        full_str = format!("./{}", full_str);
+                    }
+                }
+
+                state.proto_file_input = full_str;
+                state.proto_file_cursor = state.proto_file_input.len();
             }
         }
     }
@@ -1770,74 +2001,321 @@ fn handle_grpc_message_edit(state: &mut AppState, key: KeyEvent) {
 }
 
 fn handle_grpc_metadata_edit(state: &mut AppState, key: KeyEvent) {
-    match key.code {
-        KeyCode::Char('+') => {
-            if state.kv_edit_mode == app::state::KeyValueEditMode::None {
-                state.add_grpc_metadata();
-            }
-        }
-        KeyCode::Char('-') => {
-            if state.kv_edit_mode == app::state::KeyValueEditMode::None {
-                state.delete_grpc_metadata();
-            }
-        }
-        KeyCode::Up => {
-            if state.kv_edit_mode == app::state::KeyValueEditMode::None {
-                if state.grpc_metadata_selected > 0 {
-                    state.grpc_metadata_selected -= 1;
+    use app::state::KeyValueEditMode;
+    
+    match state.kv_edit_mode {
+        KeyValueEditMode::None => {
+            match key.code {
+                KeyCode::Up => {
+                    if state.grpc_metadata_selected > 0 {
+                        state.grpc_metadata_selected -= 1;
+                    }
                 }
-            }
-        }
-        KeyCode::Down => {
-            if state.kv_edit_mode == app::state::KeyValueEditMode::None {
-                if state.grpc_metadata_selected < state.grpc_metadata_input.len().saturating_sub(1) {
-                    state.grpc_metadata_selected += 1;
+                KeyCode::Down => {
+                    if state.grpc_metadata_selected < state.grpc_metadata_input.len().saturating_sub(1) {
+                        state.grpc_metadata_selected += 1;
+                    }
                 }
+                KeyCode::Char('+') => {
+                    state.add_grpc_metadata();
+                    // Automatically start editing the new metadata's key
+                    state.kv_edit_mode = KeyValueEditMode::Key;
+                }
+                KeyCode::Char('-') | KeyCode::Delete => {
+                    state.delete_grpc_metadata();
+                }
+                KeyCode::Enter => {
+                    if !state.grpc_metadata_input.is_empty() && state.grpc_metadata_selected < state.grpc_metadata_input.len() {
+                        state.kv_edit_mode = KeyValueEditMode::Key;
+                    }
+                }
+                _ => {}
             }
         }
-        KeyCode::Enter => {
-            if state.kv_edit_mode == app::state::KeyValueEditMode::None {
-                state.kv_edit_mode = app::state::KeyValueEditMode::Key;
-            }
-        }
-        KeyCode::Tab => {
-            if state.kv_edit_mode == app::state::KeyValueEditMode::Key {
-                state.kv_edit_mode = app::state::KeyValueEditMode::Value;
-            } else if state.kv_edit_mode == app::state::KeyValueEditMode::Value {
-                state.kv_edit_mode = app::state::KeyValueEditMode::Key;
-            }
-        }
-        KeyCode::Esc => {
-            state.kv_edit_mode = app::state::KeyValueEditMode::None;
-        }
-        KeyCode::Char(c) => {
-            if let Some((key, value)) = state.grpc_metadata_input.get_mut(state.grpc_metadata_selected) {
-                match state.kv_edit_mode {
-                    app::state::KeyValueEditMode::Key => {
+        KeyValueEditMode::Key => {
+            match (key.code, key.modifiers) {
+                (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+                    if let Some((key, _)) = state.grpc_metadata_input.get_mut(state.grpc_metadata_selected) {
+                        key.clear();
+                    }
+                }
+                (KeyCode::Esc, _) => {
+                    state.kv_edit_mode = KeyValueEditMode::None;
+                }
+                (KeyCode::Tab, _) => {
+                    state.kv_edit_mode = KeyValueEditMode::Value;
+                }
+                (KeyCode::Char(c), _) => {
+                    if let Some((key, _)) = state.grpc_metadata_input.get_mut(state.grpc_metadata_selected) {
                         key.push(c);
                     }
-                    app::state::KeyValueEditMode::Value => {
+                }
+                (KeyCode::Backspace, _) => {
+                    if let Some((key, _)) = state.grpc_metadata_input.get_mut(state.grpc_metadata_selected) {
+                        key.pop();
+                    }
+                }
+                _ => {}
+            }
+        }
+        KeyValueEditMode::Value => {
+            match (key.code, key.modifiers) {
+                (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+                    if let Some((_, value)) = state.grpc_metadata_input.get_mut(state.grpc_metadata_selected) {
+                        value.clear();
+                    }
+                }
+                (KeyCode::Esc, _) => {
+                    state.kv_edit_mode = KeyValueEditMode::None;
+                }
+                (KeyCode::Tab, _) => {
+                    state.kv_edit_mode = KeyValueEditMode::Key;
+                }
+                (KeyCode::Char(c), _) => {
+                    if let Some((_, value)) = state.grpc_metadata_input.get_mut(state.grpc_metadata_selected) {
                         value.push(c);
                     }
-                    _ => {}
+                }
+                (KeyCode::Backspace, _) => {
+                    if let Some((_, value)) = state.grpc_metadata_input.get_mut(state.grpc_metadata_selected) {
+                        value.pop();
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+
+
+fn handle_proto_loader(state: &mut AppState, key: KeyEvent, storage: &storage::Storage) {
+    use app::state::ProtoLoaderFocus;
+
+    // If showing error result, allow Enter to retry
+    if let Some(result) = &state.proto_load_result {
+        if result.contains("Error") || result.contains("Failed") {
+            match key.code {
+                KeyCode::Esc => {
+                    state.close_proto_loader();
+                    return;
+                }
+                KeyCode::Enter => {
+                    // Clear error and try again
+                    state.proto_load_result = None;
+                    state.proto_file_input = "./".to_string();
+                    state.proto_file_cursor = 2;
+                    state.proto_loader_focus = ProtoLoaderFocus::Input;
+                    return;
+                }
+                _ => {}
+            }
+            // Don't block input for errors - let user continue typing
+        }
+    }
+
+    // Handle global keys first
+    match key.code {
+        KeyCode::Esc => {
+            state.close_proto_loader();
+            return;
+        }
+        KeyCode::BackTab => {
+            // Shift+Tab: Toggle between input and schema list
+            if !state.proto_schemas.is_empty() {
+                state.proto_loader_focus = match state.proto_loader_focus {
+                    ProtoLoaderFocus::Input => ProtoLoaderFocus::SchemaList,
+                    ProtoLoaderFocus::SchemaList => ProtoLoaderFocus::Input,
+                };
+            }
+            return;
+        }
+        _ => {}
+    }
+
+    // Handle based on current focus
+    match state.proto_loader_focus {
+        ProtoLoaderFocus::Input => handle_proto_input(state, key, storage),
+        ProtoLoaderFocus::SchemaList => handle_proto_schema_list(state, key, storage),
+    }
+}
+
+fn handle_proto_input(state: &mut AppState, key: KeyEvent, storage: &storage::Storage) {
+    // Handle file input
+    match (key.code, key.modifiers) {
+        (KeyCode::Enter, _) => {
+            let file_path = state.proto_file_input.trim();
+
+            if file_path.is_empty() {
+                state.proto_load_result = Some("Error: Please enter a file path".to_string());
+                return;
+            }
+
+            // Expand ~ to home directory
+            let expanded_path = if file_path.starts_with("~/") {
+                if let Ok(home) = std::env::var("HOME") {
+                    file_path.replacen("~", &home, 1)
+                } else {
+                    file_path.to_string()
+                }
+            } else {
+                file_path.to_string()
+            };
+
+            // Load the proto file
+            let proto_loader = grpc::proto_loader::ProtoLoader::new();
+            match proto_loader.load_descriptor_file(&expanded_path) {
+                Ok(schema) => {
+                    let service_count = schema.services.len();
+                    let schema_name = schema.name.clone();
+
+                    // Check if this file is already loaded (by source_path)
+                    let existing_index = state.proto_schemas
+                        .iter()
+                        .position(|s| s.source_path == schema.source_path);
+
+                    let (action, schema_to_save) = if let Some(idx) = existing_index {
+                        // Update existing schema - preserve the original ID to avoid duplicates
+                        let old_id = state.proto_schemas[idx].id;
+                        let mut updated_schema = schema.clone();
+                        updated_schema.id = old_id;
+                        state.proto_schemas[idx] = updated_schema.clone();
+                        state.selected_proto_schema = Some(idx);
+                        ("Updated", updated_schema)
+                    } else {
+                        // Add new schema
+                        state.proto_schemas.push(schema.clone());
+                        state.selected_proto_schema = Some(state.proto_schemas.len() - 1);
+                        ("Successfully loaded", schema.clone())
+                    };
+
+                    // Save to storage
+                    let _ = storage.save_proto_schema(&schema_to_save);
+
+                    // Auto-link to current gRPC request if one is selected and we're in gRPC mode
+                    if state.protocol_type == ProtocolType::Grpc {
+                        if let Some(request_idx) = state.selected_request {
+                            if request_idx < state.grpc_requests.len() {
+                                let request = &mut state.grpc_requests[request_idx];
+                                request.proto_source = models::grpc_request::ProtoSource::File {
+                                    proto_path: schema_to_save.source_path.clone().unwrap_or_default(),
+                                    file_descriptor_set: schema_to_save.file_descriptor_set.clone(),
+                                };
+                                // Save updated request
+                                let _ = storage.save_grpc_request(request);
+                            }
+                        }
+                    }
+
+                    // Show brief status message
+                    state.proto_load_result = Some(format!(
+                        "{} '{}'",
+                        action,
+                        schema_name
+                    ));
+
+                    // Clear input for next load
+                    state.proto_file_input = "./".to_string();
+                    state.proto_file_cursor = 2;
+                }
+                Err(e) => {
+                    state.proto_load_result = Some(format!("Error: {}", e));
                 }
             }
         }
-        KeyCode::Backspace => {
-            if let Some((key, value)) = state.grpc_metadata_input.get_mut(state.grpc_metadata_selected) {
-                match state.kv_edit_mode {
-                    app::state::KeyValueEditMode::Key => {
-                        key.pop();
+        (KeyCode::Tab, _) => {
+            autocomplete_proto_file_path(state);
+        }
+        (KeyCode::Char('u'), KeyModifiers::CONTROL) => {
+            state.proto_file_input.clear();
+            state.proto_file_cursor = 0;
+        }
+        (KeyCode::Char(c), KeyModifiers::NONE) | (KeyCode::Char(c), KeyModifiers::SHIFT) => {
+            state.proto_file_input.insert(state.proto_file_cursor, c);
+            state.proto_file_cursor += 1;
+        }
+        (KeyCode::Backspace, _) => {
+            if state.proto_file_cursor > 0 {
+                state.proto_file_cursor -= 1;
+                state.proto_file_input.remove(state.proto_file_cursor);
+            }
+        }
+        (KeyCode::Delete, _) => {
+            if state.proto_file_cursor < state.proto_file_input.len() {
+                state.proto_file_input.remove(state.proto_file_cursor);
+            }
+        }
+        (KeyCode::Left, _) => {
+            if state.proto_file_cursor > 0 {
+                state.proto_file_cursor -= 1;
+            }
+        }
+        (KeyCode::Right, _) => {
+            if state.proto_file_cursor < state.proto_file_input.len() {
+                state.proto_file_cursor += 1;
+            }
+        }
+        (KeyCode::Home, _) => {
+            state.proto_file_cursor = 0;
+        }
+        (KeyCode::End, _) => {
+            state.proto_file_cursor = state.proto_file_input.len();
+        }
+        _ => {}
+    }
+}
+
+fn handle_proto_schema_list(state: &mut AppState, key: KeyEvent, storage: &storage::Storage) {
+    match key.code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            // Navigate up through proto schemas
+            if !state.proto_schemas.is_empty() {
+                if let Some(current) = state.selected_proto_schema {
+                    if current > 0 {
+                        state.selected_proto_schema = Some(current - 1);
                     }
-                    app::state::KeyValueEditMode::Value => {
-                        value.pop();
+                } else {
+                    state.selected_proto_schema = Some(0);
+                }
+            }
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            // Navigate down through proto schemas
+            if !state.proto_schemas.is_empty() {
+                if let Some(current) = state.selected_proto_schema {
+                    if current < state.proto_schemas.len() - 1 {
+                        state.selected_proto_schema = Some(current + 1);
                     }
-                    _ => {}
+                } else {
+                    state.selected_proto_schema = Some(0);
+                }
+            }
+        }
+        KeyCode::Char('d') | KeyCode::Delete | KeyCode::Backspace => {
+            // Delete selected proto schema
+            if let Some(idx) = state.selected_proto_schema {
+                if idx < state.proto_schemas.len() {
+                    let schema = state.proto_schemas.remove(idx);
+
+                    // Delete from storage
+                    let _ = storage.delete_proto_schema(&schema.id);
+
+                    // Update selection
+                    if state.proto_schemas.is_empty() {
+                        state.selected_proto_schema = None;
+                        // Switch back to input when list is empty
+                        state.proto_loader_focus = app::state::ProtoLoaderFocus::Input;
+                    } else if idx >= state.proto_schemas.len() {
+                        state.selected_proto_schema = Some(state.proto_schemas.len() - 1);
+                    } else {
+                        state.selected_proto_schema = Some(idx);
+                    }
+
+                    // Show brief status message
+                    state.proto_load_result = Some(format!("Deleted '{}'", schema.name));
                 }
             }
         }
         _ => {}
     }
 }
-
-

@@ -27,8 +27,10 @@ pub enum Action {
     CopyResponse,
     OpenExportMenu,
     OpenCurlExportMenu,
+    OpenGrpcurlExportMenu,
     ExportCollectionJson,
     ExportRequestCurl,
+    ExportGrpcRequestGrpcurl,
     OpenImportMenu,
     ImportPostmanCollection,
 }
@@ -134,6 +136,14 @@ impl Action {
                 state.export_selected_request = None;
                 state.export_result_message = None;
             }
+            Action::OpenGrpcurlExportMenu => {
+                state.show_export_menu = true;
+                state.export_mode = Some(ExportMode::GrpcRequestGrpcurl);
+                state.export_menu_stage = ExportMenuStage::SelectingCollection;
+                state.export_selected_collection = if !state.collections.is_empty() { Some(0) } else { None };
+                state.export_selected_request = None;
+                state.export_result_message = None;
+            }
             Action::ExportCollectionJson => {
                 if let Some(collection_idx) = state.export_selected_collection {
                     if let Some(collection) = state.collections.get(collection_idx) {
@@ -192,11 +202,68 @@ impl Action {
 
                         match fs::write(&filepath, format!("#!/bin/bash\n\n{}\n", curl)) {
                             Ok(_) => {
+                                // Make the file executable (Unix only)
+                                #[cfg(unix)]
+                                {
+                                    use std::os::unix::fs::PermissionsExt;
+                                    if let Ok(metadata) = fs::metadata(&filepath) {
+                                        let mut perms = metadata.permissions();
+                                        perms.set_mode(0o755); // rwxr-xr-x
+                                        let _ = fs::set_permissions(&filepath, perms);
+                                    }
+                                }
+
                                 state.export_result_message = Some(filepath.to_string_lossy().to_string());
                                 state.export_menu_stage = ExportMenuStage::ShowingResult;
                                 // Also copy to clipboard for convenience
                                 if let Ok(mut clipboard) = arboard::Clipboard::new() {
                                     let _ = clipboard.set_text(curl);
+                                }
+                            }
+                            Err(_) => {
+                                state.export_result_message = Some("Failed to save export".to_string());
+                                state.export_menu_stage = ExportMenuStage::ShowingResult;
+                            }
+                        }
+                    }
+                }
+            }
+            Action::ExportGrpcRequestGrpcurl => {
+                if let Some(request_idx) = state.export_selected_request {
+                    if let Some(request) = state.grpc_requests.get(request_idx) {
+                        let grpcurl = request.to_grpcurl();
+
+                        // Create exports directory if it doesn't exist
+                        let exports_dir = PathBuf::from("exports");
+                        let _ = fs::create_dir_all(&exports_dir);
+
+                        // Generate filename based on request name
+                        let safe_name = request.name
+                            .chars()
+                            .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+                            .collect::<String>();
+                        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+                        let filename = format!("{}_{}.sh", safe_name, timestamp);
+                        let filepath = exports_dir.join(&filename);
+
+                        match fs::write(&filepath, format!("#!/bin/bash\n\n{}\n", grpcurl)) {
+                            Ok(_) => {
+                                // Make the file executable (Unix only)
+                                #[cfg(unix)]
+                                {
+                                    use std::os::unix::fs::PermissionsExt;
+                                    if let Ok(metadata) = fs::metadata(&filepath) {
+                                        let mut perms = metadata.permissions();
+                                        perms.set_mode(0o755); // rwxr-xr-x
+                                        let _ = fs::set_permissions(&filepath, perms);
+                                    }
+                                }
+
+                                state.export_result_message = Some(filepath.to_string_lossy().to_string());
+                                state.export_menu_stage = ExportMenuStage::ShowingResult;
+                                // Also copy to clipboard for convenience
+                                if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                                    let _ = clipboard.set_text(grpcurl);
                                 }
                             }
                             Err(_) => {

@@ -79,4 +79,53 @@ impl GrpcRequest {
             description: None,
         }
     }
+
+    /// Generate grpcurl command equivalent for this request
+    pub fn to_grpcurl(&self) -> String {
+        let mut cmd = String::from("grpcurl");
+
+        // Add TLS/plaintext flag
+        if !self.use_tls {
+            cmd.push_str(" -plaintext");
+        }
+
+        // Add metadata (headers)
+        for (key, value) in &self.metadata {
+            cmd.push_str(&format!(" \\\n  -H '{}: {}'", key, value));
+        }
+
+        // Add proto source if it's from a file
+        match &self.proto_source {
+            ProtoSource::File { proto_path, .. } => {
+                // Use -protoset for .pb files (FileDescriptorSet), -proto for .proto files
+                if proto_path.ends_with(".pb") || proto_path.ends_with(".bin") {
+                    cmd.push_str(&format!(" \\\n  -protoset '{}'", proto_path));
+                } else {
+                    cmd.push_str(&format!(" \\\n  -proto '{}'", proto_path));
+                }
+            }
+            ProtoSource::Reflection { .. } => {
+                // When using reflection, grpcurl automatically uses it
+                // No additional flag needed
+            }
+        }
+
+        // Add request data
+        if !self.message_json.is_empty() && self.message_json != "{}" {
+            let escaped_json = self.message_json.replace('\'', "'\\''");
+            cmd.push_str(&format!(" \\\n  -d '{}'", escaped_json));
+        }
+
+        // Add server address and full method name
+        let full_method = if !self.service_name.is_empty() && !self.method_name.is_empty() {
+            format!("{}/{}", self.service_name, self.method_name)
+        } else {
+            "SERVICE/METHOD".to_string()
+        };
+
+        cmd.push_str(&format!(" \\\n  {} \\", self.server_url));
+        cmd.push_str(&format!("\n  {}", full_method));
+
+        cmd
+    }
 }

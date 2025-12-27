@@ -11,6 +11,7 @@ use crate::ui::{
         welcome_popup::WelcomePopup,
         export_popup::ExportPopup,
         import_popup::ImportPopup,
+        proto_loader_popup::ProtoLoaderPopup,
     },
     layout::Layout,
 };
@@ -34,6 +35,8 @@ impl UI {
             Self::draw_export_menu(frame, state);
         } else if state.show_import_menu {
             Self::draw_import_menu(frame, state);
+        } else if state.show_proto_loader {
+            Self::draw_proto_loader(frame, state);
         } else if state.show_help {
             Self::draw_help(frame, state);
         }
@@ -93,6 +96,12 @@ impl UI {
     fn draw_import_menu(frame: &mut Frame, state: &AppState) {
         let component = ImportPopup::new(state);
         let area = Self::centered_rect(frame.area(), 70, 40);
+        frame.render_widget(component, area);
+    }
+
+    fn draw_proto_loader(frame: &mut Frame, state: &AppState) {
+        let component = ProtoLoaderPopup::new(state);
+        let area = Self::centered_rect(frame.area(), 80, 50);
         frame.render_widget(component, area);
     }
 
