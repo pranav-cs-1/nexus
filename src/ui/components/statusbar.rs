@@ -45,10 +45,10 @@ impl<'a> Widget for StatusBar<'a> {
         } else {
             match self.state.protocol_type {
                 ProtocolType::Http => {
-                    format!(" [{}] q: quit | ?: help | Tab: next | Enter: send | n: new | g: new gRPC | p: toggle protocol", protocol_name)
+                    format!(" [{}] q: quit | ?: help | Tab: next | Enter: send | n: new | o: export | g: new gRPC | p: toggle protocol", protocol_name)
                 }
                 ProtocolType::Grpc => {
-                    format!(" [{}] q: quit | ?: help | Tab: next | Enter: send | n: new | l: load proto | p: toggle protocol", protocol_name)
+                    format!(" [{}] q: quit | ?: help | Tab: next | Enter: send | n: new | o: export | l: load proto | p: toggle protocol", protocol_name)
                 }
             }
         };
