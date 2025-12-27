@@ -1,15 +1,17 @@
-use crate::app::state::AppState;
+use crate::app::state::{AppState, ProtocolType};
 use crate::ui::{
     components::{
         collection_list::CollectionList,
         request_list::RequestList,
         request_editor::RequestEditor,
+        grpc_editor::GrpcEditor,
         response_viewer::ResponseViewer,
         statusbar::StatusBar,
         help_popup::HelpPopup,
         welcome_popup::WelcomePopup,
         export_popup::ExportPopup,
         import_popup::ImportPopup,
+        proto_loader_popup::ProtoLoaderPopup,
     },
     layout::Layout,
 };
@@ -33,6 +35,8 @@ impl UI {
             Self::draw_export_menu(frame, state);
         } else if state.show_import_menu {
             Self::draw_import_menu(frame, state);
+        } else if state.show_proto_loader {
+            Self::draw_proto_loader(frame, state);
         } else if state.show_help {
             Self::draw_help(frame, state);
         }
@@ -49,8 +53,16 @@ impl UI {
     }
     
     fn draw_editor(frame: &mut Frame, area: Rect, state: &AppState) {
-        let component = RequestEditor::new(state);
-        frame.render_widget(component, area);
+        match state.protocol_type {
+            ProtocolType::Http => {
+                let component = RequestEditor::new(state);
+                frame.render_widget(component, area);
+            }
+            ProtocolType::Grpc => {
+                let component = GrpcEditor::new(state);
+                frame.render_widget(component, area);
+            }
+        }
     }
     
     fn draw_response(frame: &mut Frame, area: Rect, state: &AppState) {
@@ -84,6 +96,12 @@ impl UI {
     fn draw_import_menu(frame: &mut Frame, state: &AppState) {
         let component = ImportPopup::new(state);
         let area = Self::centered_rect(frame.area(), 70, 40);
+        frame.render_widget(component, area);
+    }
+
+    fn draw_proto_loader(frame: &mut Frame, state: &AppState) {
+        let component = ProtoLoaderPopup::new(state);
+        let area = Self::centered_rect(frame.area(), 80, 50);
         frame.render_widget(component, area);
     }
 

@@ -2,12 +2,16 @@ use crate::models::{
     collection::Collection,
     request::HttpRequest,
     response::HttpResponse,
+    GrpcRequest,
+    GrpcResponse,
+    ProtoSchema,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ExportMode {
     CollectionJson,
     RequestCurl,
+    GrpcRequestGrpcurl,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -51,10 +55,33 @@ pub enum EditorField {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+pub enum GrpcEditorField {
+    Name,
+    ServerUrl,
+    ServiceName,
+    MethodName,
+    Message,
+    Metadata,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum KeyValueEditMode {
     None,
     Key,
     Value,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(dead_code)]
+pub enum ProtocolType {
+    Http,
+    Grpc,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ProtoLoaderFocus {
+    Input,
+    SchemaList,
 }
 
 #[derive(Debug)]
@@ -110,7 +137,38 @@ pub struct AppState {
     
     // Response viewer scroll state
     pub response_scroll: u16,
-    
+
+    // gRPC support
+    #[allow(dead_code)]
+    pub protocol_type: ProtocolType,
+    pub grpc_requests: Vec<GrpcRequest>,
+    #[allow(dead_code)]
+    pub grpc_response: Option<GrpcResponse>,
+    pub proto_schemas: Vec<ProtoSchema>,
+
+    // gRPC input buffers for editing
+    pub grpc_editor_focused_field: GrpcEditorField,
+    pub grpc_name_input: String,
+    pub grpc_name_cursor: usize,
+    pub grpc_server_url_input: String,
+    pub grpc_server_url_cursor: usize,
+    pub grpc_service_name_input: String,
+    pub grpc_service_name_cursor: usize,
+    pub grpc_method_name_input: String,
+    pub grpc_method_name_cursor: usize,
+    pub grpc_message_input: String,
+    pub grpc_message_cursor: usize,
+    pub grpc_metadata_input: Vec<(String, String)>,
+    pub grpc_metadata_selected: usize,
+
+    // Proto file loading
+    pub show_proto_loader: bool,
+    pub proto_file_input: String,
+    pub proto_file_cursor: usize,
+    pub proto_load_result: Option<String>,
+    pub selected_proto_schema: Option<usize>, // Index into proto_schemas
+    pub proto_loader_focus: ProtoLoaderFocus,
+
     pub should_quit: bool,
 }
 
@@ -165,7 +223,36 @@ impl AppState {
             auth_cursor: 0,
             
             response_scroll: 0,
-            
+
+            // gRPC support
+            protocol_type: ProtocolType::Http,
+            grpc_requests: Vec::new(),
+            grpc_response: None,
+            proto_schemas: Vec::new(),
+
+            // gRPC input buffers
+            grpc_editor_focused_field: GrpcEditorField::ServerUrl,
+            grpc_name_input: String::new(),
+            grpc_name_cursor: 0,
+            grpc_server_url_input: String::new(),
+            grpc_server_url_cursor: 0,
+            grpc_service_name_input: String::new(),
+            grpc_service_name_cursor: 0,
+            grpc_method_name_input: String::new(),
+            grpc_method_name_cursor: 0,
+            grpc_message_input: String::new(),
+            grpc_message_cursor: 0,
+            grpc_metadata_input: Vec::new(),
+            grpc_metadata_selected: 0,
+
+            // Proto file loading
+            show_proto_loader: false,
+            proto_file_input: "./".to_string(),
+            proto_file_cursor: 2,
+            proto_load_result: None,
+            selected_proto_schema: None,
+            proto_loader_focus: ProtoLoaderFocus::Input,
+
             should_quit: false,
         }
     }
@@ -270,8 +357,67 @@ impl AppState {
             }
         }
     }
-    
-    
+
+    pub fn load_current_grpc_request_to_input(&mut self) {
+        if let Some(request) = self.get_current_grpc_request() {
+            let name = request.name.clone();
+            let server_url = request.server_url.clone();
+            let service_name = request.service_name.clone();
+            let method_name = request.method_name.clone();
+            let message = request.message_json.clone();
+            let metadata: Vec<(String, String)> = request.metadata.iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+
+            self.grpc_name_input = name;
+            self.grpc_name_cursor = self.grpc_name_input.len();
+
+            self.grpc_server_url_input = server_url;
+            self.grpc_server_url_cursor = self.grpc_server_url_input.len();
+
+            self.grpc_service_name_input = service_name;
+            self.grpc_service_name_cursor = self.grpc_service_name_input.len();
+
+            self.grpc_method_name_input = method_name;
+            self.grpc_method_name_cursor = self.grpc_method_name_input.len();
+
+            self.grpc_message_input = message;
+            self.grpc_message_cursor = self.grpc_message_input.len();
+
+            self.grpc_metadata_input = metadata;
+            self.grpc_metadata_selected = 0;
+        }
+    }
+
+    pub fn save_grpc_input_to_request(&mut self) {
+        // Clone all the input values first to avoid borrow checker issues
+        let name = self.grpc_name_input.trim().to_string();
+        let server_url = self.grpc_server_url_input.clone();
+        let service_name = self.grpc_service_name_input.clone();
+        let method_name = self.grpc_method_name_input.clone();
+        let message = self.grpc_message_input.clone();
+        let metadata = self.grpc_metadata_input.clone();
+
+        if let Some(request) = self.get_current_grpc_request_mut() {
+            if !name.is_empty() {
+                request.name = name;
+            }
+
+            request.server_url = server_url;
+            request.service_name = service_name;
+            request.method_name = method_name;
+            request.message_json = message;
+
+            request.metadata.clear();
+            for (key, value) in &metadata {
+                if !key.is_empty() {
+                    request.metadata.insert(key.clone(), value.clone());
+                }
+            }
+        }
+    }
+
+
     pub fn next_panel(&mut self) {
         use Panel::*;
         self.focused_panel = match self.focused_panel {
@@ -308,23 +454,49 @@ impl AppState {
             .and_then(|idx| self.collections.get(idx))
             .map(|c| c.id);
 
-        if let Some(current_idx) = self.selected_request {
-            // Find the next request that belongs to the same collection
-            for idx in (current_idx + 1)..self.requests.len() {
-                let request_collection_id = self.requests.get(idx).and_then(|r| r.collection_id);
-                if collection_id == request_collection_id {
-                    self.selected_request = Some(idx);
-                    self.clear_input_buffers();
-                    return;
+        match self.protocol_type {
+            ProtocolType::Http => {
+                if let Some(current_idx) = self.selected_request {
+                    // Find the next request that belongs to the same collection
+                    for idx in (current_idx + 1)..self.requests.len() {
+                        let request_collection_id = self.requests.get(idx).and_then(|r| r.collection_id);
+                        if collection_id == request_collection_id {
+                            self.selected_request = Some(idx);
+                            self.clear_input_buffers();
+                            return;
+                        }
+                    }
+                } else if !self.requests.is_empty() {
+                    // Find the first request that belongs to the selected collection
+                    for (idx, request) in self.requests.iter().enumerate() {
+                        if collection_id == request.collection_id {
+                            self.selected_request = Some(idx);
+                            self.clear_input_buffers();
+                            return;
+                        }
+                    }
                 }
             }
-        } else if !self.requests.is_empty() {
-            // Find the first request that belongs to the selected collection
-            for (idx, request) in self.requests.iter().enumerate() {
-                if collection_id == request.collection_id {
-                    self.selected_request = Some(idx);
-                    self.clear_input_buffers();
-                    return;
+            ProtocolType::Grpc => {
+                if let Some(current_idx) = self.selected_request {
+                    // Find the next gRPC request that belongs to the same collection
+                    for idx in (current_idx + 1)..self.grpc_requests.len() {
+                        let request_collection_id = self.grpc_requests.get(idx).and_then(|r| r.collection_id);
+                        if collection_id == request_collection_id {
+                            self.selected_request = Some(idx);
+                            self.clear_input_buffers();
+                            return;
+                        }
+                    }
+                } else if !self.grpc_requests.is_empty() {
+                    // Find the first gRPC request that belongs to the selected collection
+                    for (idx, request) in self.grpc_requests.iter().enumerate() {
+                        if collection_id == request.collection_id {
+                            self.selected_request = Some(idx);
+                            self.clear_input_buffers();
+                            return;
+                        }
+                    }
                 }
             }
         }
@@ -336,15 +508,34 @@ impl AppState {
             .and_then(|idx| self.collections.get(idx))
             .map(|c| c.id);
 
-        if let Some(current_idx) = self.selected_request {
-            // Find the previous request that belongs to the same collection
-            if current_idx > 0 {
-                for idx in (0..current_idx).rev() {
-                    let request_collection_id = self.requests.get(idx).and_then(|r| r.collection_id);
-                    if collection_id == request_collection_id {
-                        self.selected_request = Some(idx);
-                        self.clear_input_buffers();
-                        return;
+        match self.protocol_type {
+            ProtocolType::Http => {
+                if let Some(current_idx) = self.selected_request {
+                    // Find the previous request that belongs to the same collection
+                    if current_idx > 0 {
+                        for idx in (0..current_idx).rev() {
+                            let request_collection_id = self.requests.get(idx).and_then(|r| r.collection_id);
+                            if collection_id == request_collection_id {
+                                self.selected_request = Some(idx);
+                                self.clear_input_buffers();
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+            ProtocolType::Grpc => {
+                if let Some(current_idx) = self.selected_request {
+                    // Find the previous gRPC request that belongs to the same collection
+                    if current_idx > 0 {
+                        for idx in (0..current_idx).rev() {
+                            let request_collection_id = self.grpc_requests.get(idx).and_then(|r| r.collection_id);
+                            if collection_id == request_collection_id {
+                                self.selected_request = Some(idx);
+                                self.clear_input_buffers();
+                                return;
+                            }
+                        }
                     }
                 }
             }
@@ -373,26 +564,49 @@ impl AppState {
     }
     
     pub fn update_selected_request_for_collection(&mut self) {
-        if let Some(collection_idx) = self.selected_collection {
-            if let Some(collection) = self.collections.get(collection_idx) {
-                let collection_id = collection.id;
-                if let Some(first_request_idx) = self.requests.iter().position(|r| r.collection_id == Some(collection_id)) {
-                    self.selected_request = Some(first_request_idx);
+        match self.protocol_type {
+            ProtocolType::Http => {
+                if let Some(collection_idx) = self.selected_collection {
+                    if let Some(collection) = self.collections.get(collection_idx) {
+                        let collection_id = collection.id;
+                        if let Some(first_request_idx) = self.requests.iter().position(|r| r.collection_id == Some(collection_id)) {
+                            self.selected_request = Some(first_request_idx);
+                        } else {
+                            self.selected_request = None;
+                        }
+                    }
                 } else {
-                    self.selected_request = None;
+                    if let Some(first_request_idx) = self.requests.iter().position(|r| r.collection_id.is_none()) {
+                        self.selected_request = Some(first_request_idx);
+                    } else {
+                        self.selected_request = None;
+                    }
                 }
             }
-        } else {
-            if let Some(first_request_idx) = self.requests.iter().position(|r| r.collection_id.is_none()) {
-                self.selected_request = Some(first_request_idx);
-            } else {
-                self.selected_request = None;
+            ProtocolType::Grpc => {
+                if let Some(collection_idx) = self.selected_collection {
+                    if let Some(collection) = self.collections.get(collection_idx) {
+                        let collection_id = collection.id;
+                        if let Some(first_request_idx) = self.grpc_requests.iter().position(|r| r.collection_id == Some(collection_id)) {
+                            self.selected_request = Some(first_request_idx);
+                        } else {
+                            self.selected_request = None;
+                        }
+                    }
+                } else {
+                    if let Some(first_request_idx) = self.grpc_requests.iter().position(|r| r.collection_id.is_none()) {
+                        self.selected_request = Some(first_request_idx);
+                    } else {
+                        self.selected_request = None;
+                    }
+                }
             }
         }
         self.clear_input_buffers();
     }
     
     pub fn clear_input_buffers(&mut self) {
+        // Clear HTTP input buffers
         self.name_input.clear();
         self.name_cursor = 0;
         self.method_input = 0;
@@ -408,6 +622,20 @@ impl AppState {
         self.auth_cursor = 0;
         self.input_mode = InputMode::Normal;
         self.kv_edit_mode = KeyValueEditMode::None;
+
+        // Clear gRPC input buffers
+        self.grpc_name_input.clear();
+        self.grpc_name_cursor = 0;
+        self.grpc_server_url_input.clear();
+        self.grpc_server_url_cursor = 0;
+        self.grpc_service_name_input.clear();
+        self.grpc_service_name_cursor = 0;
+        self.grpc_method_name_input.clear();
+        self.grpc_method_name_cursor = 0;
+        self.grpc_message_input.clear();
+        self.grpc_message_cursor = 0;
+        self.grpc_metadata_input.clear();
+        self.grpc_metadata_selected = 0;
     }
     
     pub fn start_editing_collection(&mut self) {
@@ -467,7 +695,21 @@ impl AppState {
             }
         }
     }
-    
+
+    pub fn add_grpc_metadata(&mut self) {
+        self.grpc_metadata_input.push((String::new(), String::new()));
+        self.grpc_metadata_selected = self.grpc_metadata_input.len().saturating_sub(1);
+    }
+
+    pub fn delete_grpc_metadata(&mut self) {
+        if !self.grpc_metadata_input.is_empty() && self.grpc_metadata_selected < self.grpc_metadata_input.len() {
+            self.grpc_metadata_input.remove(self.grpc_metadata_selected);
+            if self.grpc_metadata_selected >= self.grpc_metadata_input.len() && !self.grpc_metadata_input.is_empty() {
+                self.grpc_metadata_selected = self.grpc_metadata_input.len() - 1;
+            }
+        }
+    }
+
     pub fn scroll_response_down(&mut self) {
         self.response_scroll = self.response_scroll.saturating_add(1);
     }
@@ -478,6 +720,49 @@ impl AppState {
     
     pub fn reset_response_scroll(&mut self) {
         self.response_scroll = 0;
+    }
+
+    // gRPC request helpers
+
+    #[allow(dead_code)]
+    pub fn get_current_grpc_request(&self) -> Option<&GrpcRequest> {
+        self.selected_request.and_then(|idx| self.grpc_requests.get(idx))
+    }
+
+    #[allow(dead_code)]
+    pub fn get_current_grpc_request_mut(&mut self) -> Option<&mut GrpcRequest> {
+        self.selected_request.and_then(|idx| self.grpc_requests.get_mut(idx))
+    }
+
+    #[allow(dead_code)]
+    pub fn get_all_requests_count(&self) -> usize {
+        match self.protocol_type {
+            ProtocolType::Http => self.requests.len(),
+            ProtocolType::Grpc => self.grpc_requests.len(),
+        }
+    }
+
+    // Proto file management helpers
+
+    pub fn get_selected_proto_schema(&self) -> Option<&ProtoSchema> {
+        self.selected_proto_schema
+            .and_then(|idx| self.proto_schemas.get(idx))
+    }
+
+    pub fn open_proto_loader(&mut self) {
+        self.show_proto_loader = true;
+        self.proto_file_input = "./".to_string();
+        self.proto_file_cursor = 2;
+        self.proto_load_result = None;
+        self.proto_loader_focus = ProtoLoaderFocus::Input;
+    }
+
+    pub fn close_proto_loader(&mut self) {
+        self.show_proto_loader = false;
+        self.proto_file_input.clear();
+        self.proto_file_cursor = 0;
+        self.proto_load_result = None;
+        self.proto_loader_focus = ProtoLoaderFocus::Input;
     }
 }
 

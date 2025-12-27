@@ -1,4 +1,4 @@
-use crate::app::state::AppState;
+use crate::app::state::{AppState, ProtocolType};
 use ratatui::{
     layout::Rect,
     widgets::{Block, Paragraph, Widget},
@@ -35,10 +35,22 @@ impl<'a> Widget for StatusBar<'a> {
             return;
         }
 
+        let protocol_name = match self.state.protocol_type {
+            ProtocolType::Http => "HTTP",
+            ProtocolType::Grpc => "gRPC",
+        };
+
         let full_text = if self.state.is_loading {
-            format!(" Loading... | {}", self.state.loading_message)
+            format!(" [{}] Loading... | {}", protocol_name, self.state.loading_message)
         } else {
-            " q: quit | ?: help | Tab: next panel | Enter: send | n: new | i: import | o: export menu | s: export curl".to_string()
+            match self.state.protocol_type {
+                ProtocolType::Http => {
+                    format!(" [{}] q: quit | ?: help | Tab: next | Enter: send | n: new | g: new gRPC | p: toggle protocol", protocol_name)
+                }
+                ProtocolType::Grpc => {
+                    format!(" [{}] q: quit | ?: help | Tab: next | Enter: send | n: new | l: load proto | p: toggle protocol", protocol_name)
+                }
+            }
         };
 
         let status_text = Self::truncate_text(&full_text, area.width as usize);

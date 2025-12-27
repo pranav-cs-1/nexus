@@ -62,6 +62,7 @@ impl<'a> ExportPopup<'a> {
         let title = match self.state.export_mode {
             Some(ExportMode::CollectionJson) => "Export Collection as JSON",
             Some(ExportMode::RequestCurl) => "Export Request as curl - Select Collection",
+            Some(ExportMode::GrpcRequestGrpcurl) => "Export gRPC Request as grpcurl - Select Collection",
             None => "Export",
         };
         
@@ -112,51 +113,119 @@ impl<'a> ExportPopup<'a> {
     }
     
     fn render_request_selection(&self, area: Rect, buf: &mut ratatui::buffer::Buffer) {
+        let (title, nav_title) = match self.state.export_mode {
+            Some(ExportMode::RequestCurl) => (
+                "Export Request as curl - Select Request",
+                "Export Request as curl - Use ↑↓ to select, Enter to export, Esc to go back"
+            ),
+            Some(ExportMode::GrpcRequestGrpcurl) => (
+                "Export gRPC Request as grpcurl - Select Request",
+                "Export gRPC Request as grpcurl - Use ↑↓ to select, Enter to export, Esc to go back"
+            ),
+            _ => ("Select Request", "Use ↑↓ to select, Enter to export, Esc to go back"),
+        };
+
         let block = Block::default()
-            .title("Export Request as curl - Select Request")
+            .title(title)
             .borders(Borders::ALL)
             .border_style(Theme::focused_border());
-        
+
         if let Some(collection_idx) = self.state.export_selected_collection {
             if let Some(collection) = self.state.collections.get(collection_idx) {
-                let requests_in_collection: Vec<_> = self.state.requests
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, r)| r.collection_id == Some(collection.id))
-                    .collect();
-                
-                if requests_in_collection.is_empty() {
-                    let paragraph = Paragraph::new(vec![
-                        Line::from(""),
-                        Line::from("No requests in this collection"),
-                        Line::from(""),
-                        Line::from("Press Esc to go back..."),
-                        Line::from(""),
-                    ]).block(block);
-                    Widget::render(paragraph, area, buf);
-                } else {
-                    let items: Vec<ListItem> = requests_in_collection
-                        .iter()
-                        .map(|(global_idx, request)| {
-                            let is_selected = Some(*global_idx) == self.state.export_selected_request;
-                            let style = if is_selected {
-                                Theme::selected()
-                            } else {
-                                Style::default()
-                            };
-                            
-                            let text = format!("{} - {}", request.method.as_str(), request.name);
-                            ListItem::new(text).style(style)
-                        })
-                        .collect();
-                    
-                    let list = List::new(items).block(
-                        Block::default()
-                            .title("Export Request as curl - Use ↑↓ to select, Enter to export, Esc to go back")
-                            .borders(Borders::ALL)
-                            .border_style(Theme::focused_border())
-                    );
-                    Widget::render(list, area, buf);
+                match self.state.export_mode {
+                    Some(ExportMode::RequestCurl) => {
+                        // Handle HTTP requests
+                        let requests_in_collection: Vec<_> = self.state.requests
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, r)| r.collection_id == Some(collection.id))
+                            .collect();
+
+                        if requests_in_collection.is_empty() {
+                            let paragraph = Paragraph::new(vec![
+                                Line::from(""),
+                                Line::from("No HTTP requests in this collection"),
+                                Line::from(""),
+                                Line::from("Press Esc to go back..."),
+                                Line::from(""),
+                            ]).block(block);
+                            Widget::render(paragraph, area, buf);
+                        } else {
+                            let items: Vec<ListItem> = requests_in_collection
+                                .iter()
+                                .map(|(global_idx, request)| {
+                                    let is_selected = Some(*global_idx) == self.state.export_selected_request;
+                                    let style = if is_selected {
+                                        Theme::selected()
+                                    } else {
+                                        Style::default()
+                                    };
+
+                                    let text = format!("{} - {}", request.method.as_str(), request.name);
+                                    ListItem::new(text).style(style)
+                                })
+                                .collect();
+
+                            let list = List::new(items).block(
+                                Block::default()
+                                    .title(nav_title)
+                                    .borders(Borders::ALL)
+                                    .border_style(Theme::focused_border())
+                            );
+                            Widget::render(list, area, buf);
+                        }
+                    }
+                    Some(ExportMode::GrpcRequestGrpcurl) => {
+                        // Handle gRPC requests
+                        let requests_in_collection: Vec<_> = self.state.grpc_requests
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, r)| r.collection_id == Some(collection.id))
+                            .collect();
+
+                        if requests_in_collection.is_empty() {
+                            let paragraph = Paragraph::new(vec![
+                                Line::from(""),
+                                Line::from("No gRPC requests in this collection"),
+                                Line::from(""),
+                                Line::from("Press Esc to go back..."),
+                                Line::from(""),
+                            ]).block(block);
+                            Widget::render(paragraph, area, buf);
+                        } else {
+                            let items: Vec<ListItem> = requests_in_collection
+                                .iter()
+                                .map(|(global_idx, request)| {
+                                    let is_selected = Some(*global_idx) == self.state.export_selected_request;
+                                    let style = if is_selected {
+                                        Theme::selected()
+                                    } else {
+                                        Style::default()
+                                    };
+
+                                    let text = format!("gRPC - {}", request.name);
+                                    ListItem::new(text).style(style)
+                                })
+                                .collect();
+
+                            let list = List::new(items).block(
+                                Block::default()
+                                    .title(nav_title)
+                                    .borders(Borders::ALL)
+                                    .border_style(Theme::focused_border())
+                            );
+                            Widget::render(list, area, buf);
+                        }
+                    }
+                    _ => {
+                        // Fallback
+                        let paragraph = Paragraph::new(vec![
+                            Line::from(""),
+                            Line::from("Invalid export mode"),
+                            Line::from(""),
+                        ]).block(block);
+                        Widget::render(paragraph, area, buf);
+                    }
                 }
             }
         }

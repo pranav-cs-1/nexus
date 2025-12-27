@@ -1,4 +1,4 @@
-use crate::app::state::{AppState, Panel};
+use crate::app::state::{AppState, Panel, ProtocolType};
 use crate::ui::theme::Theme;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -173,49 +173,114 @@ impl<'a> Widget for ResponseViewer<'a> {
             .borders(Borders::ALL)
             .border_style(border_style);
         
-        if let Some(response) = &self.state.current_response {
-            let inner_area = block.inner(area);
-            block.render(area, buf);
-            
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(1),
-                    Constraint::Min(0),
-                ])
-                .split(inner_area);
-            
-            let status_line = Line::from(vec![
-                Span::styled(
-                    format!("{} ", response.status_code),
-                    ratatui::style::Style::default().fg(response.status_color()),
-                ),
-                Span::raw(&response.status_text),
-                Span::raw(format!(" | {}ms | {} bytes", 
-                    response.duration_ms, 
-                    response.size_bytes
-                )),
-            ]);
-            
-            let status_paragraph = Paragraph::new(status_line);
-            status_paragraph.render(chunks[0], buf);
-            
-            let body = response.formatted_body();
-            
-            let body_content = if response.is_json() {
-                self.colorize_json(&body)
-            } else {
-                vec![Line::from(body)]
-            };
-            
-            let body_paragraph = Paragraph::new(body_content)
-                .wrap(Wrap { trim: false })
-                .scroll((self.state.response_scroll, 0));
-            body_paragraph.render(chunks[1], buf);
-        } else {
-            let no_response = Paragraph::new("No response yet\n\nPress Enter to send request")
-                .block(block);
-            no_response.render(area, buf);
+        match self.state.protocol_type {
+            ProtocolType::Http => {
+                if let Some(response) = &self.state.current_response {
+                    let inner_area = block.inner(area);
+                    block.render(area, buf);
+
+                    let chunks = Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([
+                            Constraint::Length(1),
+                            Constraint::Min(0),
+                        ])
+                        .split(inner_area);
+
+                    let status_line = Line::from(vec![
+                        Span::styled(
+                            format!("{} ", response.status_code),
+                            ratatui::style::Style::default().fg(response.status_color()),
+                        ),
+                        Span::raw(&response.status_text),
+                        Span::raw(format!(" | {}ms | {} bytes",
+                            response.duration_ms,
+                            response.size_bytes
+                        )),
+                    ]);
+
+                    let status_paragraph = Paragraph::new(status_line);
+                    status_paragraph.render(chunks[0], buf);
+
+                    let body = response.formatted_body();
+
+                    let body_content = if response.is_json() {
+                        self.colorize_json(&body)
+                    } else {
+                        vec![Line::from(body)]
+                    };
+
+                    let body_paragraph = Paragraph::new(body_content)
+                        .wrap(Wrap { trim: false })
+                        .scroll((self.state.response_scroll, 0));
+                    body_paragraph.render(chunks[1], buf);
+                } else {
+                    let no_response = Paragraph::new("No response yet\n\nPress Enter to send request")
+                        .block(block);
+                    no_response.render(area, buf);
+                }
+            }
+            ProtocolType::Grpc => {
+                if let Some(response) = &self.state.grpc_response {
+                    let inner_area = block.inner(area);
+                    block.render(area, buf);
+
+                    let chunks = Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([
+                            Constraint::Length(1),
+                            Constraint::Min(0),
+                        ])
+                        .split(inner_area);
+
+                    let status_color = if response.status.code == 0 {
+                        Color::Green
+                    } else {
+                        Color::Red
+                    };
+
+                    let status_line = Line::from(vec![
+                        Span::styled(
+                            format!("Code {} ", response.status.code),
+                            ratatui::style::Style::default().fg(status_color),
+                        ),
+                        Span::raw(&response.status.message),
+                        Span::raw(format!(" | {}ms | {} message(s)",
+                            response.duration_ms,
+                            response.messages.len()
+                        )),
+                    ]);
+
+                    let status_paragraph = Paragraph::new(status_line);
+                    status_paragraph.render(chunks[0], buf);
+
+                    // Display messages
+                    let body = if response.messages.is_empty() {
+                        if response.status.code == 0 {
+                            "Success (no message body)".to_string()
+                        } else {
+                            format!("Error: {}", response.status.message)
+                        }
+                    } else {
+                        response.messages
+                            .iter()
+                            .map(|msg| msg.message_json.as_str())
+                            .collect::<Vec<_>>()
+                            .join("\n\n")
+                    };
+
+                    let body_content = self.colorize_json(&body);
+
+                    let body_paragraph = Paragraph::new(body_content)
+                        .wrap(Wrap { trim: false })
+                        .scroll((self.state.response_scroll, 0));
+                    body_paragraph.render(chunks[1], buf);
+                } else {
+                    let no_response = Paragraph::new("No response yet\n\nPress Enter to send gRPC request")
+                        .block(block);
+                    no_response.render(area, buf);
+                }
+            }
         }
     }
 }

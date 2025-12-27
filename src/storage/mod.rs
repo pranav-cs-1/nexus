@@ -2,10 +2,12 @@ use anyhow::{Context, Result};
 use sled::Db;
 use std::path::PathBuf;
 
-use crate::models::{collection::Collection, request::HttpRequest};
+use crate::models::{collection::Collection, request::HttpRequest, GrpcRequest, ProtoSchema};
 
 const COLLECTIONS_TREE: &str = "collections";
 const REQUESTS_TREE: &str = "requests";
+const GRPC_REQUESTS_TREE: &str = "grpc_requests";
+const PROTO_SCHEMAS_TREE: &str = "proto_schemas";
 
 pub struct Storage {
     db: Db,
@@ -150,7 +152,139 @@ impl Storage {
         
         self.db.flush()
             .context("Failed to flush database")?;
-        
+
+        Ok(())
+    }
+
+    // gRPC request storage methods
+
+    #[allow(dead_code)]
+    pub fn save_grpc_request(&self, request: &GrpcRequest) -> Result<()> {
+        let tree = self.db.open_tree(GRPC_REQUESTS_TREE)
+            .context("Failed to open gRPC requests tree")?;
+
+        let key = request.id.as_bytes();
+        let value = bincode::serialize(request)
+            .context("Failed to serialize gRPC request")?;
+
+        tree.insert(key, value)
+            .context("Failed to save gRPC request")?;
+
+        self.db.flush()
+            .context("Failed to flush database")?;
+
+        Ok(())
+    }
+
+    pub fn load_grpc_requests(&self) -> Result<Vec<GrpcRequest>> {
+        let tree = self.db.open_tree(GRPC_REQUESTS_TREE)
+            .context("Failed to open gRPC requests tree")?;
+
+        let mut requests = Vec::new();
+
+        for result in tree.iter() {
+            let (_, value) = result.context("Failed to iterate gRPC requests")?;
+            let request: GrpcRequest = bincode::deserialize(&value)
+                .context("Failed to deserialize gRPC request")?;
+            requests.push(request);
+        }
+
+        requests.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+
+        Ok(requests)
+    }
+
+    #[allow(dead_code)]
+    pub fn delete_grpc_request(&self, id: &uuid::Uuid) -> Result<()> {
+        let tree = self.db.open_tree(GRPC_REQUESTS_TREE)
+            .context("Failed to open gRPC requests tree")?;
+
+        tree.remove(id.as_bytes())
+            .context("Failed to delete gRPC request")?;
+
+        self.db.flush()
+            .context("Failed to flush database")?;
+
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    pub fn delete_grpc_requests_by_collection(&self, collection_id: &uuid::Uuid) -> Result<()> {
+        let tree = self.db.open_tree(GRPC_REQUESTS_TREE)
+            .context("Failed to open gRPC requests tree")?;
+
+        let mut keys_to_delete = Vec::new();
+
+        for result in tree.iter() {
+            let (key, value) = result.context("Failed to iterate gRPC requests")?;
+            let request: GrpcRequest = bincode::deserialize(&value)
+                .context("Failed to deserialize gRPC request")?;
+
+            if request.collection_id == Some(*collection_id) {
+                keys_to_delete.push(key.to_vec());
+            }
+        }
+
+        for key in keys_to_delete {
+            tree.remove(key)
+                .context("Failed to delete gRPC request")?;
+        }
+
+        self.db.flush()
+            .context("Failed to flush database")?;
+
+        Ok(())
+    }
+
+    // Proto schema storage methods
+
+    #[allow(dead_code)]
+    pub fn save_proto_schema(&self, schema: &ProtoSchema) -> Result<()> {
+        let tree = self.db.open_tree(PROTO_SCHEMAS_TREE)
+            .context("Failed to open proto schemas tree")?;
+
+        let key = schema.id.as_bytes();
+        let value = bincode::serialize(schema)
+            .context("Failed to serialize proto schema")?;
+
+        tree.insert(key, value)
+            .context("Failed to save proto schema")?;
+
+        self.db.flush()
+            .context("Failed to flush database")?;
+
+        Ok(())
+    }
+
+    pub fn load_proto_schemas(&self) -> Result<Vec<ProtoSchema>> {
+        let tree = self.db.open_tree(PROTO_SCHEMAS_TREE)
+            .context("Failed to open proto schemas tree")?;
+
+        let mut schemas = Vec::new();
+
+        for result in tree.iter() {
+            let (_, value) = result.context("Failed to iterate proto schemas")?;
+            let schema: ProtoSchema = bincode::deserialize(&value)
+                .context("Failed to deserialize proto schema")?;
+            schemas.push(schema);
+        }
+
+        schemas.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+
+        Ok(schemas)
+    }
+
+    #[allow(dead_code)]
+    pub fn delete_proto_schema(&self, id: &uuid::Uuid) -> Result<()> {
+        let tree = self.db.open_tree(PROTO_SCHEMAS_TREE)
+            .context("Failed to open proto schemas tree")?;
+
+        tree.remove(id.as_bytes())
+            .context("Failed to delete proto schema")?;
+
+        self.db.flush()
+            .context("Failed to flush database")?;
+
         Ok(())
     }
 }
