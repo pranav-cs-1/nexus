@@ -107,39 +107,6 @@ async fn main() -> anyhow::Result<()> {
         request4.collection_id = Some(collection_id);
         storage.save_request(&request4)?;
         state.requests.push(request4);
-        
-        let mut request5 = models::request::HttpRequest::new(
-            "TEST: Full Editor Test (No Auth)".to_string(),
-            models::request::HttpMethod::PUT,
-            "https://httpbin.org/anything".to_string(),
-        )
-        .with_query_param("test_param_1".to_string(), "value_one".to_string())
-        .with_query_param("test_param_2".to_string(), "value_two".to_string())
-        .with_query_param("number".to_string(), "42".to_string())
-        .with_header("Content-Type".to_string(), "application/json".to_string())
-        .with_header("Accept".to_string(), "application/json".to_string())
-        .with_header("X-Test-Header".to_string(), "test-value-123".to_string())
-        .with_header("User-Agent".to_string(), "Nexus-TUI-Tester/1.0".to_string())
-        .with_body(r#"{
-  "test": true,
-  "message": "This is a comprehensive test",
-  "data": {
-    "name": "Nexus Test",
-    "version": "1.0",
-    "features": ["params", "headers", "body", "method"]
-  },
-  "numbers": [1, 2, 3, 42],
-  "nested": {
-    "level1": {
-      "level2": {
-        "deep": "value"
-      }
-    }
-  }
-}"#.to_string());
-        request5.collection_id = Some(collection_id);
-        storage.save_request(&request5)?;
-        state.requests.push(request5);
     } else {
         // Set initial selections if data exists
         if !state.collections.is_empty() {
