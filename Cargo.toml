@@ -1,6 +1,6 @@
 [package]
 name = "nexus-tui"
-version = "0.1.3"
+version = "0.2.0"
 edition = "2021"
 authors = ["pranav-cs-1"]
 description = "A terminal-based HTTP client for API testing"
